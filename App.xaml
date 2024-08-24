@@ -1,0 +1,25 @@
+﻿<Application x:Class="SampleWpf.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:SampleWpf"
+             StartupUri="MainWindow.xaml">
+    <Application.Resources>
+        <FontFamily x:Key="MaterialIconsRegular">/Fonts/MaterialIcons-Regular.ttf#Material Icons</FontFamily>
+        
+        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+
+
+        <local:MicMuteIconConverter x:Key="MicMuteIconConverter"/>
+        <local:CamMuteIconConverter x:Key="CamMuteIconConverter"/>
+        <local:MuteTextConverter    x:Key="MuteTextConverter"/>
+        
+        <local:HoldStateIconConverter x:Key="HoldStateIconConverter"/>
+        <local:HoldStateTextConverter x:Key="HoldStateTextConverter"/>        
+        
+        <local:CallDirectionIconConverter x:Key="CallDirectionIconConverter"/>
+        <local:RegStateIconConverter x:Key="RegStateIconConverter"/>
+        <local:RegStateColorConverter x:Key="RegStateColorConverter"/>
+
+        <local:SwitchedCallColorConverter x:Key="SwitchedCallColorConverter"/>
+    </Application.Resources>
+</Application>

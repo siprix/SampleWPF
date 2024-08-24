@@ -1,0 +1,286 @@
+﻿<UserControl x:Class="SampleWpf.CallControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"              
+             xmlns:local="clr-namespace:SampleWpf"
+             mc:Ignorable="d"  d:DesignHeight="450" d:DesignWidth="800">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- 'Video' controls -->
+        <Grid  x:Name="gridVideo"  Grid.Row="0" Grid.RowSpan="4" Visibility="Collapsed"  d:Visibility="Visible">
+            <Border x:Name="receivedVideo" Background="AliceBlue"                          
+                          HorizontalAlignment="Right" VerticalAlignment="Bottom" Width="176" Height="144"/>
+
+            <Border x:Name="previewVideo" Background="Aqua"
+                          HorizontalAlignment="Right" VerticalAlignment="Top" Width="176" Height="144" />
+
+            <Button Width="70" Height="40"  HorizontalAlignment="Left" VerticalAlignment="Bottom"
+                    Command="{Binding MuteCamCommand}"
+                    Visibility="{Binding CanMuteCam, Converter={StaticResource BoolToVis}}">
+                <StackPanel Orientation="Vertical" >
+                    <TextBlock Text="{Binding IsCamMuted, Converter={StaticResource CamMuteIconConverter}, Mode=OneWay}"                           
+                        FontFamily="{StaticResource MaterialIconsRegular}"  FontSize="20" HorizontalAlignment="Center" />
+                    <TextBlock Text="{Binding IsCamMuted, Converter={StaticResource MuteTextConverter}, Mode=OneWay}" />
+                </StackPanel>
+            </Button>
+
+        </Grid>
+
+
+        <!-- 'Name and extension'  -->
+        <TextBlock x:Name="tbNameAndExt" Text="{Binding NameAndExt}" 
+                   FontWeight="Bold" Grid.Row="0" FontSize="16" HorizontalAlignment="Center"
+                   d:Text="NameAndExt" Visibility="Collapsed" d:Visibility="Visible"/>
+        
+        <!-- 'Call details' section -->
+        <StackPanel x:Name="spDetails" Orientation="Vertical" Grid.Row="1" HorizontalAlignment="Center" 
+                    Visibility="Collapsed"  d:Visibility="Visible">
+            <TextBlock FontWeight="Bold">
+                <Run Text="State: "/>
+                <Run Text="{Binding CallState, Mode=OneWay}" d:Text="Connecting"/>
+            </TextBlock>
+
+            <TextBlock>
+                <Run Text="Acc: "/>
+                <Run Text="{Binding AccUri, Mode=OneWay}" d:Text="x.x.x.x"/>
+            </TextBlock>
+
+            <TextBlock>
+                <Run Text="CallId: "/>
+                <Run Text="{Binding ID, Mode=OneWay}" d:Text="201"/>
+            </TextBlock>
+
+            <TextBlock>
+                <Run Text="DTMF: "/>
+                <Run Text="{Binding ReceivedDtmf, Mode=OneWay}" />
+            </TextBlock>
+
+            <TextBlock FontWeight="Bold" Text="{Binding Duration}" d:Text="xx:xx" 
+                       HorizontalAlignment="Center" FontSize="14" Foreground="Green" />
+        </StackPanel>
+
+        <!-- 'Make outgoing call' button -->
+        <Button x:Name="bnMakeCall" Width="70" Height="45" Grid.Row="2" Click="AddCall_Click" VerticalAlignment="Center" d:Visibility="Hidden">
+            <StackPanel Orientation="Vertical"  >
+                <TextBlock Text="{x:Static local:Icons.add_call}" HorizontalAlignment="Center"
+             FontFamily="{StaticResource MaterialIconsRegular}"  FontSize="20" />
+                <TextBlock Text="Make call" HorizontalAlignment="Center"/>
+            </StackPanel>
+        </Button>
+
+        <!-- 'Redirect incoming call' button -->
+        <Button x:Name="bnRedirect"  Width="70" Height="40" Grid.Row="2" Visibility="Collapsed"
+                Click = "TransferBlindMode_Click">
+            <StackPanel Orientation="Vertical"  >
+                <TextBlock  Text="{x:Static local:Icons.forward}" HorizontalAlignment="Center"
+                    FontFamily="{StaticResource MaterialIconsRegular}"  FontSize="20" />
+                <TextBlock Text="Redirect" />
+            </StackPanel>
+        </Button>
+
+        <!-- 'Hangup call' button -->
+        <Button x:Name="bnHangup"  Width="70" Height="40" Grid.Row="3" Visibility="Collapsed"
+                Margin="0,0,0,10" Command="{Binding HangupCommand}">
+            <StackPanel Orientation="Vertical"  >
+                <TextBlock  Text="{x:Static local:Icons.call_end}" HorizontalAlignment="Center" Foreground="Red"
+                            FontFamily="{StaticResource MaterialIconsRegular}"  FontSize="20" />
+                <TextBlock Text="Hangup" />
+            </StackPanel>
+        </Button>
+
+        <!-- 'Accept/Reject incoming call' section -->
+        <StackPanel x:Name="spAcceptReject" Orientation="Horizontal" Grid.Row="3" HorizontalAlignment="Center" 
+                    Visibility="Collapsed">
+            <Button  Width="70" Height="40" Margin="10" Command="{Binding RejectCommand}">
+                <StackPanel Orientation="Vertical">
+                    <TextBlock  Text="{x:Static local:Icons.call_end}" HorizontalAlignment="Center" Foreground="Red"
+                        FontFamily="{StaticResource MaterialIconsRegular}"  FontSize="20" />
+                    <TextBlock Text="Reject" />
+                </StackPanel>
+            </Button>
+
+            <Button  Width="70" Height="40"  Margin="10" Command="{Binding AcceptCommand}">
+                <StackPanel Orientation="Vertical"  >
+                    <TextBlock  Text="{x:Static local:Icons.call}" HorizontalAlignment="Center" Foreground="Green"
+                        FontFamily="{StaticResource MaterialIconsRegular}"  FontSize="20" />
+                    <TextBlock Text="Accept" />
+                </StackPanel>
+            </Button>
+        </StackPanel>
+
+        <!-- 'Redirect/Transfer' section -->
+        <StackPanel x:Name="gridTransfer" Grid.Row="2" Orientation="Horizontal" Visibility="Collapsed"
+                    VerticalAlignment="Center" HorizontalAlignment="Center">
+
+            <Border Width="120" Height="Auto"  BorderThickness="1" BorderBrush="Gray">
+                <TextBox x:Name="tbTransferToExt" />
+            </Border>
+
+            <Button x:Name="bnTransfer" Content="Transfer" Height="20" Margin="3,0" HorizontalAlignment="Right" 
+                    IsEnabled="{Binding ElementName=tbTransferToExt, Path=Text.Length}" 
+                    Click="TransferBlind_Click"/>
+
+            <Button  Width="20" Height="20"  HorizontalAlignment="Right" Click="TransferBlindMode_Click">
+                <TextBlock  Text="{x:Static local:Icons.close}" HorizontalAlignment="Center" 
+                    FontFamily="{StaticResource MaterialIconsRegular}" FontSize="18" />
+            </Button>
+            
+        </StackPanel>
+        
+        <!-- 'Send DTMF' section -->
+        <Grid x:Name="gridDtmf" Grid.Row="2" Width="Auto" Height="Auto" 
+              HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed" >
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <Border Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="3" Margin="3,0,26,0" BorderThickness="1" BorderBrush="Gray">
+                <TextBox x:Name="tbSentDtmf" IsReadOnly="True" TextWrapping="WrapWithOverflow"/>
+            </Border>
+            <Button  Grid.Column="2"  Grid.Row="0"  Width="20" Margin="3,0" Height="20" HorizontalAlignment="Right"  Click="DtmfMode_Click">
+                <TextBlock  Text="{x:Static local:Icons.close}" HorizontalAlignment="Center" 
+                    FontFamily="{StaticResource MaterialIconsRegular}" FontSize="18" />
+            </Button>
+
+            <Button Content="1" Grid.Column="0" Grid.Row="1" Margin="3" Width="50" Height="20" Tag="1" Click = "DtmfSend_Click"/>
+            <Button Content="2" Grid.Column="1" Grid.Row="1" Margin="3" Width="50" Height="20" Tag="2" Click = "DtmfSend_Click"/>
+            <Button Content="3" Grid.Column="2" Grid.Row="1" Margin="3" Width="50" Height="20" Tag="3" Click = "DtmfSend_Click"/>
+                                                                                                     
+            <Button Content="4" Grid.Column="0" Grid.Row="2" Margin="3" Width="50" Height="20" Tag="4" Click = "DtmfSend_Click"/>
+            <Button Content="5" Grid.Column="1" Grid.Row="2" Margin="3" Width="50" Height="20" Tag="5" Click = "DtmfSend_Click"/>
+            <Button Content="7" Grid.Column="2" Grid.Row="2" Margin="3" Width="50" Height="20" Tag="7" Click = "DtmfSend_Click"/>
+                                                                                                     
+            <Button Content="7" Grid.Column="0" Grid.Row="3" Margin="3" Width="50" Height="20" Tag="7" Click = "DtmfSend_Click"/>
+            <Button Content="8" Grid.Column="1" Grid.Row="3" Margin="3" Width="50" Height="20" Tag="8" Click = "DtmfSend_Click"/>
+            <Button Content="9" Grid.Column="2" Grid.Row="3" Margin="3" Width="50" Height="20" Tag="9" Click = "DtmfSend_Click"/>
+                                                                                                     
+            <Button Content="*" Grid.Column="0" Grid.Row="4" Margin="3" Width="50" Height="20" Tag="*" Click = "DtmfSend_Click"/>
+            <Button Content="0" Grid.Column="1" Grid.Row="4" Margin="3" Width="50" Height="20" Tag="0" Click = "DtmfSend_Click"/>
+            <Button Content="#" Grid.Column="2" Grid.Row="4" Margin="3" Width="50" Height="20" Tag="#" Click = "DtmfSend_Click"/>
+        </Grid>
+
+
+        <!-- 'Main call controls' section -->
+        <Grid x:Name="gridMain" Grid.Row="2" Width="Auto" Height="Auto" 
+                HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Hidden">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />                
+            </Grid.RowDefinitions>
+
+            <Button Width="70" Height="40"  Margin="10" Grid.Column="0" Grid.Row="0" 
+                    Command="{Binding MuteMicCommand}"
+                    Visibility="{Binding CanMuteMic, Converter={StaticResource BoolToVis}}">
+                <StackPanel Orientation="Vertical" >
+                    <TextBlock Text="{Binding IsMicMuted, Converter={StaticResource MicMuteIconConverter}, Mode=OneWay}"
+                          FontFamily="{StaticResource MaterialIconsRegular}"  FontSize="20" HorizontalAlignment="Center" />
+                    <TextBlock Text="{Binding IsMicMuted, Converter={StaticResource MuteTextConverter}, Mode=OneWay}" />
+                </StackPanel>
+            </Button> 
+
+            <Button x:Name="bnDtmfMode" Width="70" Height="40"  Margin="10" Grid.Column="1" Grid.Row="0" Click="DtmfMode_Click">
+                <StackPanel Orientation="Vertical"  >
+                    <TextBlock  Text="{x:Static local:Icons.dialpad}" HorizontalAlignment="Center" 
+                        FontFamily="{StaticResource MaterialIconsRegular}"  FontSize="20" />
+                    <TextBlock Text="DTMF" />
+                </StackPanel>
+            </Button>
+
+            <Button  Width="70" Height="40"  Margin="10" Grid.Column="2" Grid.Row="0" >
+                <StackPanel Orientation="Vertical"  >
+                    <TextBlock  Text="{x:Static local:Icons.volume_up}" HorizontalAlignment="Center" 
+                        FontFamily="{StaticResource MaterialIconsRegular}"  FontSize="20" />
+                    <TextBlock Text="Speaker" />
+                </StackPanel>
+            </Button>
+
+            <Button  Width="70" Height="40"  Margin="10" Grid.Column="0" Grid.Row="1" Click="AddCall_Click">
+                <StackPanel Orientation="Vertical"  >
+                    <TextBlock  Text="{x:Static local:Icons.add}" HorizontalAlignment="Center" 
+                        FontFamily="{StaticResource MaterialIconsRegular}"  FontSize="20" />
+                    <TextBlock Text="Add call" />
+                </StackPanel>
+            </Button>
+
+            <Button  Width="70" Height="40"  Margin="10" Grid.Column="1" Grid.Row="1" 
+                     Command="{Binding HoldCommand}"
+                     Visibility="{Binding CanHold, Converter={StaticResource BoolToVis}}">
+                <StackPanel Orientation="Vertical" >
+                    <TextBlock  Text="{Binding HoldState, Converter={StaticResource HoldStateIconConverter}, Mode=OneWay}"
+                        FontFamily="{StaticResource MaterialIconsRegular}"  FontSize="20"  HorizontalAlignment="Center" />
+                    <TextBlock Text="{Binding HoldState, Converter={StaticResource HoldStateTextConverter}, Mode=OneWay}" />
+                </StackPanel>
+            </Button>
+
+            <Button x:Name="MenuButton" Width="70" Height="40"  Margin="10" Grid.Column="2" Grid.Row="1"
+                    Click="ButtonMenu_Click" MouseRightButtonUp="ButtonMenu_Click">
+                <StackPanel Orientation="Vertical"  >
+                    <TextBlock  Text="{x:Static local:Icons.more_horiz}" HorizontalAlignment="Center" 
+                        FontFamily="{StaticResource MaterialIconsRegular}"  FontSize="20" />
+                    <TextBlock Text="Other" />
+                </StackPanel>
+
+                <Button.ContextMenu>
+                    <ContextMenu >
+                        <MenuItem Header="Make/end conference" Height="24"  IsEnabled="False">
+                            <MenuItem.Icon>
+                                <TextBlock Text="{x:Static local:Icons.call_merge}" FontFamily="{StaticResource MaterialIconsRegular}"  FontSize="16" />
+                            </MenuItem.Icon>
+                        </MenuItem>
+
+                        <MenuItem Header="Transfer attended" Height="24"  IsEnabled="False">
+                            <MenuItem.Icon>
+                                <TextBlock Text="{x:Static local:Icons.phone_forwarded}" FontFamily="{StaticResource MaterialIconsRegular}"  FontSize="16" />
+                            </MenuItem.Icon>
+                        </MenuItem>
+
+                        <MenuItem Header="Transfer" Height="24" Click="TransferBlindMode_Click">
+                            <MenuItem.Icon>
+                                <TextBlock Text="{x:Static local:Icons.forward}" FontFamily="{StaticResource MaterialIconsRegular}"  FontSize="16" />
+                            </MenuItem.Icon>
+                        </MenuItem>
+
+                        <Separator />
+
+                        <MenuItem Header="Play File" Height="24"  IsEnabled="False">
+                            <MenuItem.Icon>
+                                <TextBlock Text="{x:Static local:Icons.play_arrow}" FontFamily="{StaticResource MaterialIconsRegular}"  FontSize="16" />
+                            </MenuItem.Icon>
+                        </MenuItem>
+
+                        <MenuItem Header="Record" Height="24"   IsEnabled="False">
+                            <MenuItem.Icon>
+                                <TextBlock Text="{x:Static local:Icons.radio_button_checked}" FontFamily="{StaticResource MaterialIconsRegular}"  FontSize="16" />
+                            </MenuItem.Icon>
+                        </MenuItem>
+                    </ContextMenu >
+                </Button.ContextMenu>
+            </Button>
+        </Grid>
+
+    </Grid>
+</UserControl>

@@ -1,0 +1,64 @@
+﻿<Window x:Class="SampleWpf.AddAccountWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:SampleWpf"
+        mc:Ignorable="d"
+        Title="Add Account" Height="Auto" Width="300"
+        WindowStyle="ToolWindow"
+        SizeToContent="WidthAndHeight"
+        WindowStartupLocation="CenterOwner" 
+        ShowInTaskbar="False"
+        ResizeMode="NoResize">
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <TextBlock  Text="Server (PBX):" Grid.Row="0" Margin="5"/>
+        <TextBox x:Name="tbSipServer"  d:Text="server" Grid.Row="0" Grid.Column="1" Margin="5"/>
+
+        <TextBlock  Text="Extension:" Grid.Row="1"  Margin="5"/>
+        <TextBox x:Name="tbSipExtension"  d:Text="extension" Grid.Row="1" Grid.Column="1" Margin="5"/>
+
+        <TextBlock  Text="Password:" Grid.Row="2" Margin="5"/>
+        <PasswordBox x:Name="tbSipPassword" Grid.Row="2" Grid.Column="1" Margin="5"/>
+
+        <Separator Grid.Row="3" Grid.ColumnSpan="2" VerticalAlignment="Center" Margin="5,0"/>
+        
+        <TextBlock Text="Expire time (sec):" Grid.Row="4"  Margin="5"/>
+        <TextBox  x:Name="tbExpireTime"  d:Text="expire" Grid.Row="4" Grid.Column="1" Margin="5"/>
+
+        <TextBlock  Text="Display name:" Grid.Row="5"  Margin="5"/>
+        <TextBox  x:Name="tbDisplayName"  d:Text="display name" Grid.Row="5" Grid.Column="1" Margin="5"/>
+
+        <TextBlock  Text="Transport:" Grid.Row="6"  Margin="5" />
+        <ComboBox x:Name="cbTransport" Grid.Row="6" Grid.Column="1" Margin="5"/>
+
+        <TextBlock  Text="Secure media:" Grid.Row="7"  Margin="5" />
+        <ComboBox x:Name="cbSecureMedia" Grid.Row="7" Grid.Column="1" Margin="5"/>
+
+        <TextBlock x:Name="tbErrText" Text="Error text" HorizontalAlignment="Center" Visibility="Collapsed" d:Visibility="Visible"
+            Grid.Row="8" Grid.ColumnSpan="2" Grid.Column="0" Margin="5" Foreground="Red"/>
+
+        <StackPanel Grid.Row="9" Grid.ColumnSpan="2" Orientation="Horizontal" HorizontalAlignment="Center" >
+            <Button x:Name="btnOK" Content="OK"  Width="100" Margin="15" HorizontalAlignment="Right" Click="btnOK_Click"/>
+            <Button x:Name="btnCancel" Content="Cancel" Width="100" Margin="15" HorizontalAlignment="Right" Click="btnCancel_Click"/>
+        </StackPanel>
+    </Grid>
+</Window>

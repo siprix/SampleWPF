@@ -1,0 +1,260 @@
+﻿<Window x:Class="SampleWpf.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:b="http://schemas.microsoft.com/xaml/behaviors"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:SampleWpf"
+        Loaded="Window_Loaded" mc:Ignorable="d"
+        Title="Siprix VoIP App" Height="600" Width="600" Closed="Window_Closed">
+    <Window.Resources>
+        <DataTemplate x:Key="accRowTemplate">
+            <Grid >
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Grid.Column="0" Text="{Binding RegState, Converter={StaticResource RegStateIconConverter}, Mode=OneWay}"  
+                                     Foreground="{Binding RegState, Converter={StaticResource RegStateColorConverter}, Mode=OneWay}" 
+                           FontFamily="{StaticResource MaterialIconsRegular}" 
+                           FontSize="22" Margin="8" VerticalAlignment="Center"  />
+
+                <ProgressBar Width="20" Height="20" IsIndeterminate="True" Grid.Column="0" Margin="4"
+                    Visibility="{Binding IsWaiting, Converter={StaticResource BoolToVis}}"/>
+
+                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding Uri}" FontWeight="Bold" />
+                    <TextBlock Grid.Column="1" Grid.Row="1" Foreground="Gray">
+                        <Italic>
+                            <Run Text="ID:"/>
+                            <Run Text="{Binding ID, Mode=OneWay}" />
+                            <Run Text="Reg:" />
+                            <Run Text="{Binding RegText, Mode=OneWay}" />
+                        </Italic>
+                    </TextBlock>
+                </StackPanel>
+
+                <Button Content="..." Margin="0,6,3,6" Width="25" Grid.Column="2" 
+                              Click="ButtonMenu_Click" MouseRightButtonUp="ButtonMenu_Click">
+                    <Button.ContextMenu>
+                        <ContextMenu >
+                            <MenuItem Header="Edit" Click="AccountEdit_Click" Tag="{Binding ID}" >
+                                <MenuItem.Icon>
+                                    <TextBlock Text="{x:Static local:Icons.edit}" FontFamily="{StaticResource MaterialIconsRegular}" FontSize="16" />
+                                </MenuItem.Icon>
+                            </MenuItem>
+                            
+                            <MenuItem Header="Register"  Command="{Binding RegisterCommand}">
+                                <MenuItem.Icon>
+                                    <TextBlock Text="{x:Static local:Icons.refresh}" FontFamily="{StaticResource MaterialIconsRegular}"  FontSize="16" />
+                                </MenuItem.Icon>
+                            </MenuItem>
+
+                            <MenuItem Header="Unregister"  Command="{Binding UnRegisterCommand}">
+                                <MenuItem.Icon>
+                                    <TextBlock Text="{x:Static local:Icons.cancel_presentation}" FontFamily="{StaticResource MaterialIconsRegular}"  FontSize="16" />
+                                </MenuItem.Icon>
+                            </MenuItem>
+
+                            <Separator />
+
+                            <MenuItem Header="Delete" Click="AccountDelete_Click" Tag="{Binding ID}">
+                                <MenuItem.Icon>
+                                    <TextBlock Text="{x:Static local:Icons.delete}" FontFamily="{StaticResource MaterialIconsRegular}"  FontSize="16" />
+                                </MenuItem.Icon>
+                            </MenuItem>
+                        </ContextMenu>
+                    </Button.ContextMenu>
+                </Button>
+            </Grid>
+        </DataTemplate>
+
+        <DataTemplate x:Key="callRowTemplate">
+            <Grid Background="{Binding IsSwitchedCall, Converter={StaticResource SwitchedCallColorConverter}, Mode=OneWay}" >
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Text="{Binding IsIncoming, Converter={StaticResource CallDirectionIconConverter}, Mode=OneWay}"  Grid.Column="0" 
+                     FontFamily="{StaticResource MaterialIconsRegular}" Foreground="Green" 
+                     FontSize="22" Margin="2" VerticalAlignment="Center"  />
+                
+                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding NameAndExt}"  FontWeight="Bold"  />
+                    <TextBlock Foreground="Gray" >
+                        <Italic>
+                            <Run Text="{Binding CallState, Mode=OneWay}" />
+                        </Italic>
+                    </TextBlock>
+                </StackPanel>
+
+                <TextBlock Text="{x:Static local:Icons.lock_lock}"  Grid.Column="2" 
+                     Visibility="{Binding HasSecureMedia, Converter={StaticResource BoolToVis}}"
+                     FontFamily="{StaticResource MaterialIconsRegular}" 
+                     FontSize="16"  VerticalAlignment="Center"  />
+
+                <ProgressBar Width="20" Margin="6" IsIndeterminate="True" Grid.Column="3" 
+                     Visibility="{Binding IsWaiting, Converter={StaticResource BoolToVis}}"/>
+
+                <TextBlock Text="{Binding Duration}" Grid.Column="4" VerticalAlignment="Center"
+                      Visibility="{Binding IsConnected, Converter={StaticResource BoolToVis}}"/>
+
+                <Button Content="..." Margin="6,6,3,6" Width="25" Grid.Column="5" 
+                        Click="ButtonMenu_Click" MouseRightButtonUp="ButtonMenu_Click">
+                    <Button.ContextMenu>
+                        <ContextMenu >
+                            <MenuItem Header="Accept" Command="{Binding AcceptCommand}" Visibility="{Binding CanAccept, Converter={StaticResource BoolToVis}}">
+                                <MenuItem.Icon>
+                                    <TextBlock Text="{x:Static local:Icons.call}" Foreground="Green"
+                                               FontFamily="{StaticResource MaterialIconsRegular}"  FontSize="16" />
+                                </MenuItem.Icon>
+                            </MenuItem>
+
+                            <MenuItem Header="Reject" Command="{Binding RejectCommand}" Visibility="{Binding CanReject, Converter={StaticResource BoolToVis}}">
+                                <MenuItem.Icon>
+                                    <TextBlock Text="{x:Static local:Icons.call_end}" Foreground="Red"
+                                               FontFamily="{StaticResource MaterialIconsRegular}"  FontSize="16" />
+                                </MenuItem.Icon>
+                            </MenuItem>
+
+                            <MenuItem Header="SwitchTo" Command="{Binding SwitchToCommand}" Visibility="{Binding CanSwitchTo, Converter={StaticResource BoolToVis}}">
+                                <MenuItem.Icon>
+                                    <TextBlock Text="{x:Static local:Icons.swap_calls}" 
+                                               FontFamily="{StaticResource MaterialIconsRegular}"  FontSize="16" />
+                                </MenuItem.Icon>
+                            </MenuItem>
+
+                            <MenuItem Header ="{Binding HoldState, Converter={StaticResource HoldStateTextConverter}, Mode=OneWay}" 
+                                      Command="{Binding HoldCommand}" Visibility="{Binding CanHold, Converter={StaticResource BoolToVis}}">
+                                <MenuItem.Icon>
+                                    <TextBlock Text="{Binding HoldState, Converter={StaticResource HoldStateIconConverter}, Mode=OneWay}" 
+                                               FontFamily="{StaticResource MaterialIconsRegular}"  FontSize="16" />
+                                </MenuItem.Icon>
+                            </MenuItem>
+
+                            <MenuItem Header="Hangup" Command="{Binding HangupCommand}" 
+                                      Visibility="{Binding CanHangup, Converter={StaticResource BoolToVis}}">
+                                <MenuItem.Icon>
+                                    <TextBlock Text="{x:Static local:Icons.call_end}" Foreground="Red"
+                                               FontFamily="{StaticResource MaterialIconsRegular}"  FontSize="16" />
+                                </MenuItem.Icon>
+                            </MenuItem>
+                        </ContextMenu >
+                    </Button.ContextMenu>
+                </Button>
+            </Grid>
+        </DataTemplate>
+
+        <Style x:Key="listRowBorder" TargetType="ListBoxItem">
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="BorderBrush" Value="Gray" />
+            <Setter Property="Margin" Value="0,1" />
+        </Style>
+
+    </Window.Resources>
+
+    <DockPanel>
+        <!--NetworkLost indicator -->
+        <TextBlock x:Name="tbNetworkLost" Margin="2,0" DockPanel.Dock="Bottom" Height="20" 
+                   Visibility="{Binding NetworkLost, Converter={StaticResource BoolToVis}}"                   
+                   Background="red" Foreground="White" TextAlignment="Center" >
+            <Bold>Internet connection lost</Bold>
+        </TextBlock>
+
+        <TabControl x:Name="mainTabCtrl" TabStripPlacement="Top" Margin="2" DockPanel.Dock="Top">
+            <!--Accounts Tab -->
+            <TabItem >
+            <TabItem.Header>
+                <StackPanel Orientation="Horizontal" >
+                    <TextBlock Text="{x:Static local:Icons.list}" FontFamily="{StaticResource MaterialIconsRegular}"  FontSize="20" />
+                    <TextBlock Text="Accounts" Margin="2,0,0,0" VerticalAlignment="Center" />
+                </StackPanel>
+            </TabItem.Header>
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>                   
+
+                <Button Content="Add account..." Width="100" Height="20" Margin="2,3"
+                        VerticalAlignment="Top" HorizontalAlignment="Right" Click="AccountAdd_Click" />
+
+                <ListBox Margin="0,25,1,0" Name="lbAccounts" BorderThickness="0" HorizontalContentAlignment="Stretch"
+                     ItemsSource="{Binding Path=Collection}" SelectedItem="{Binding Path=SelectedAccount, Mode=TwoWay}"
+                     ItemTemplate="{StaticResource accRowTemplate}"
+                     ItemContainerStyle="{StaticResource listRowBorder}"/>
+
+                <Separator Grid.Row="0" VerticalAlignment="Bottom"/>
+
+                <Border Grid.Row="1" Grid.RowSpan="2" Background="WhiteSmoke" />
+
+                <TextBlock Text="{x:Static local:Icons.info}" Grid.Row="1" Grid.RowSpan="2" VerticalAlignment="Center" HorizontalAlignment="Left"
+                        FontFamily="{StaticResource MaterialIconsRegular}" Foreground="DarkBlue" FontSize="20" Margin="5,0,0,0" />
+
+                <TextBlock Text="Product website:" Grid.Row="1" Margin="30,0,0,0"/>
+                <TextBlock Grid.Row="1" Margin="140,0,0,0">
+                    <Hyperlink NavigateUri="https://siprix-voip.com" RequestNavigate="Hyperlink_RequestNavigate">
+                        <Hyperlink.Inlines>
+                             <Run Text="siprix-voip.com"/>
+                        </Hyperlink.Inlines>
+                    </Hyperlink>
+                </TextBlock>
+
+                <TextBlock Text="Online manual:" Grid.Row="2" Margin="30,0,0,0"/>
+                <TextBlock Grid.Row="2" Margin="140,0,0,0">
+                    <Hyperlink NavigateUri="https://docs.siprix-voip.com" RequestNavigate="Hyperlink_RequestNavigate">
+                        <Hyperlink.Inlines>                           
+                             <Run Text="docs.siprix-voip.com"/>
+                        </Hyperlink.Inlines>
+                    </Hyperlink>
+                </TextBlock>
+            </Grid>
+        </TabItem>
+
+        <!--Calls Tab -->
+        <TabItem>
+            <TabItem.Header >
+                <StackPanel Orientation="Horizontal" >
+                    <TextBlock Text="{x:Static local:Icons.phone}" FontFamily="{StaticResource MaterialIconsRegular}"  FontSize="20" />
+                    <TextBlock Text="Calls" Margin="2,0,0,0" VerticalAlignment="Center" />
+                </StackPanel>
+            </TabItem.Header>
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="1*"  MinHeight="80" MaxHeight="180" />
+                    <RowDefinition Height="3*" />
+                </Grid.RowDefinitions>
+               
+                <ListBox Margin="1" Name="lbCalls" BorderThickness="0" HorizontalContentAlignment="Stretch"                     
+                     ItemsSource="{Binding Path=Collection}"
+                     ItemContainerStyle="{StaticResource listRowBorder}" 
+                     ItemTemplate="{StaticResource callRowTemplate}"/>
+                 
+                <local:CallControl x:Name="switchedCallCtrl" Grid.Row="1"/>
+             </Grid>
+         </TabItem>
+
+        <!--Logs Tab -->
+        <TabItem>
+            <TabItem.Header>
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="{x:Static local:Icons.description}" FontFamily="{StaticResource MaterialIconsRegular}"  FontSize="20" />
+                    <TextBlock Text="Logs" Margin="2,0,0,0" VerticalAlignment="Center" />
+                </StackPanel>
+            </TabItem.Header>
+            <TextBox x:Name="tbLogs" Text="{Binding LogText, Mode=OneWay}" Margin="1" IsReadOnly="True" BorderThickness="0" />                         
+        </TabItem>
+        
+    </TabControl>
+
+    </DockPanel>
+    
+</Window>
