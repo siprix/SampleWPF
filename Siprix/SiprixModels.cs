@@ -24,7 +24,7 @@ namespace Siprix
     
     /////////////////////////////////////////////////////////////////
     /// AccountModel
-    public class AccountModel : INotifyPropertyChanged, IEquatable<AccountModel>
+    public class AccountModel : INotifyPropertyChanged
     {
         public event PropertyChangedEventHandler? PropertyChanged;
         readonly ObjModel parent_;
@@ -97,12 +97,12 @@ namespace Siprix
             //Update UI
             accData_.ExpireTime = expireSec;
             RegState = RegState.InProgress;
-            NotifyPropertyChanged("RegState");
-            NotifyPropertyChanged("IsWaiting");
+            NotifyPropertyChanged(nameof(RegState));
+            NotifyPropertyChanged(nameof(IsWaiting));
 
             //Save changes
             parent_.postSaveAccountsChanges();
-            parent_.Logs?.Print($"{cmd}ing accId:{ID}");            
+            parent_.Logs?.Print($"{cmd}ing accId:{ID}");
             return err;
         }
         
@@ -111,14 +111,14 @@ namespace Siprix
         {
             RegState = state;
             RegText  = response;
-            NotifyPropertyChanged("RegText");
-            NotifyPropertyChanged("RegState");
-            NotifyPropertyChanged("IsWaiting");
+            NotifyPropertyChanged(nameof(RegText));
+            NotifyPropertyChanged(nameof(RegState));
+            NotifyPropertyChanged(nameof(IsWaiting));
         }
 
         public JsonDict storeToJson()
         {
-            JsonDict dict = new JsonDict();
+            JsonDict dict = new();
             
             dict.Add("SipServer",    accData_.SipServer);
             dict.Add("SipExtension", accData_.SipExtension);
@@ -154,7 +154,7 @@ namespace Siprix
 
         public static Siprix.AccData loadFromJson(JsonElement elem)
         {
-            Siprix.AccData accData = new Siprix.AccData();
+            Siprix.AccData accData = new();
 
             foreach (JsonProperty prop in elem.EnumerateObject())
             {
@@ -188,7 +188,7 @@ namespace Siprix
                     case "RewriteContactIp":   accData.RewriteContactIp   = prop.Value.GetBoolean(); break;
                     case "AudioCodecs":                         
                     {
-                        accData.AudioCodecs = new();
+                        accData.AudioCodecs = [];
                         foreach (JsonElement cElem in prop.Value.EnumerateArray())
                         {
                             accData.AudioCodecs.Add((AudioCodec)cElem.GetInt32());
@@ -198,7 +198,7 @@ namespace Siprix
 
                     case "VideoCodecs": 
                     {
-                        accData.VideoCodecs = new();
+                        accData.VideoCodecs = [];
                         foreach (JsonElement cElem in prop.Value.EnumerateArray())
                         {
                             accData.VideoCodecs.Add((VideoCodec)cElem.GetInt32());
@@ -208,7 +208,7 @@ namespace Siprix
 
                     case "Xheaders":                     
                     {
-                        accData.Xheaders = new();
+                        accData.Xheaders = [];
                         foreach (JsonProperty xProp in prop.Value.EnumerateObject())
                         {
                             if(xProp.Value.ValueKind == JsonValueKind.String)
@@ -231,17 +231,11 @@ namespace Siprix
     /////////////////////////////////////////////////////////////////
     /// AccountsListModel
 
-    public class AccountsListModel
+    public class AccountsListModel(ObjModel parent)
     {
-        ObservableCollection<AccountModel> collection_;
-        AccountModel? selAccount_;        
-        readonly ObjModel parent_;
-
-        public AccountsListModel(ObjModel parent)
-        {
-            collection_ = new ObservableCollection<AccountModel>();            
-            parent_ = parent;
-        }
+        readonly ObservableCollection<AccountModel> collection_ = new();
+        readonly ObjModel parent_ = parent;
+        AccountModel? selAccount_;
 
         public ObservableCollection<AccountModel> Collection { get { return collection_; } }
 
@@ -279,11 +273,10 @@ namespace Siprix
                 return err;
             }
 
-            AccountModel acc = new AccountModel(accData, parent_);
+            AccountModel acc = new(accData, parent_);
             collection_.Add(acc);
 
-            if (selAccount_ == null) 
-                selAccount_ = acc;
+            selAccount_ ??= acc;
 
             parent_.Logs?.Print($"Added successfully with id: {acc.ID}");
             if (saveChanges) parent_.postSaveAccountsChanges();
@@ -346,7 +339,7 @@ namespace Siprix
 
         public string storeToJson()
         {
-            List<JsonDict> jsonAccList = new();
+            List<JsonDict> jsonAccList = [];
             foreach(var accModel in collection_)
             {
                 jsonAccList.Add(accModel.storeToJson());
@@ -392,7 +385,9 @@ namespace Siprix
         bool micMuted_ = false;
         bool camMuted_ = false;
         bool withVideo_;
-        uint playerId_ = 0;
+        bool isFilePlaying_ = false;
+        readonly List<uint> playerIds_ = [];
+        
 
         public event PropertyChangedEventHandler? PropertyChanged;
         readonly ObjModel parent_;
@@ -425,7 +420,7 @@ namespace Siprix
             return (displName_.Length == 0) ? remoteExt_ : $"{displName_} ({remoteExt_})"; } 
         }
        
-        public uint   ID                { get { return myCallId_;       } }                
+        public uint   ID                { get { return myCallId_;       } }
         public CallState CallState      { get { return callState_;      } }
         public HoldState HoldState      { get { return holdState_;      } }
         public string Duration          { get { return duration_;       } }
@@ -435,9 +430,10 @@ namespace Siprix
         public bool   IsWaiting         { get { return (callState_ != CallState.Connected) &&(callState_ != CallState.Held); } }
         public bool   IsConnected       { get { return (callState_ == CallState.Connected); } }
         public bool   IsRinging         { get { return (callState_ == CallState.Ringing);   } }
+        public bool   IsFilePlaying     { get { return isFilePlaying_; } }
         public bool   WithVideo         { get { return withVideo_;      } }
         public bool   IsMicMuted        { get { return micMuted_;       } }
-        public bool   IsCamMuted        { get { return camMuted_;       } }        
+        public bool   IsCamMuted        { get { return camMuted_;       } }
         public string AccUri            { get { return accUri_;         } }
         public string ReceivedDtmf      { get { return receivedDtmf_;   } }
 
@@ -457,10 +453,10 @@ namespace Siprix
         public bool CanHangup           { get { return callState_ != CallState.Ringing; }}
         public bool CanSwitchTo         { get { return !IsSwitchedCall;  } }
 
-        public void setDisplName(string name) { displName_ = name;  NotifyPropertyChanged("NameAndExt"); }
-        void setMicMuted(bool muted)          { micMuted_  = muted; NotifyPropertyChanged("IsMicMuted"); }
-        void setCamMuted(bool muted)          { camMuted_  = muted; NotifyPropertyChanged("IsCamMuted"); }
-        void setWithVideo(bool video)         { withVideo_ = video; NotifyPropertyChanged("WithVideo"); }
+        public void setDisplName(string name) { displName_ = name;  NotifyPropertyChanged(nameof(NameAndExt)); }
+        void setMicMuted(bool muted)          { micMuted_  = muted; NotifyPropertyChanged(nameof(IsMicMuted)); }
+        void setCamMuted(bool muted)          { camMuted_  = muted; NotifyPropertyChanged(nameof(IsCamMuted)); }
+        void setWithVideo(bool video)         { withVideo_ = video; NotifyPropertyChanged(nameof(WithVideo)); }
 
 
         private void NotifyPropertyChanged([CallerMemberName] String propertyName = "")
@@ -471,21 +467,21 @@ namespace Siprix
         private void setCallState(CallState newState)
         {
             callState_ = newState;
-            NotifyPropertyChanged("CallState");
-            NotifyPropertyChanged("IsWaiting");
-            NotifyPropertyChanged("IsConnected");
-            NotifyPropertyChanged("IsRinging");
-            NotifyPropertyChanged("CanAccept");
-            NotifyPropertyChanged("CanReject");
-            NotifyPropertyChanged("CanHold");
-            NotifyPropertyChanged("CanMuteMic");
-            NotifyPropertyChanged("CanMuteCam");
+            NotifyPropertyChanged(nameof(CallState));
+            NotifyPropertyChanged(nameof(IsWaiting));
+            NotifyPropertyChanged(nameof(IsConnected));
+            NotifyPropertyChanged(nameof(IsRinging));
+            NotifyPropertyChanged(nameof(CanAccept));
+            NotifyPropertyChanged(nameof(CanReject));
+            NotifyPropertyChanged(nameof(CanHold));
+            NotifyPropertyChanged(nameof(CanMuteMic));
+            NotifyPropertyChanged(nameof(CanMuteCam));
         }
 
         private void setHoldState(HoldState holdState)
         {
             holdState_ = holdState;
-            NotifyPropertyChanged("HoldState");
+            NotifyPropertyChanged(nameof(HoldState));
         }
 
         public bool Equals(CallModel? other) { 
@@ -499,7 +495,7 @@ namespace Siprix
             TimeSpan span = (DateTime.Now - startTime_);
             duration_ = (span.Hours !=0) ? string.Format("{0}:{1:D2}:{2:D2}", span.Hours, span.Minutes, span.Seconds)
                                          : string.Format("{0:D2}:{1:D2}", span.Minutes, span.Seconds);
-            NotifyPropertyChanged("Duration");
+            NotifyPropertyChanged(nameof(Duration));
         }
 
         public int SwitchTo()
@@ -564,10 +560,28 @@ namespace Siprix
         public int PlayFile(String pathToMp3File, bool loop)
         {
             parent_.Logs?.Print($"Starting play file callId:{myCallId_} {pathToMp3File}");
-            int err = parent_.Module.Call_PlayFile(myCallId_, pathToMp3File, loop, ref playerId_);
+            uint playerId = 0;
+            int err = parent_.Module.Call_PlayFile(myCallId_, pathToMp3File, loop, ref playerId);
             if (err != Siprix.Module.kNoErr)
                 parent_.Logs?.Print($"Cant PlayFile callId:{myCallId_} Err:{err} {parent_.ErrorText(err)}");
-            return err;        
+            else
+                playerIds_.Add(playerId);
+            return err;
+        }
+
+        public int StopPlayFile()
+        {
+            int retErr = Siprix.Module.kNoErr;
+            foreach(var playerId in playerIds_)
+            {
+                parent_.Logs?.Print($"Stop play file in callId:{myCallId_} playerId:{playerId}");
+                int err = parent_.Module.Call_StopFile(playerId);
+                if (err != Siprix.Module.kNoErr) {
+                    parent_.Logs?.Print($"Cant StopPlayFile Err:{err} {parent_.ErrorText(err)}");
+                    retErr = err;
+                }
+            }
+            return retErr;
         }
 
         public int Hold()
@@ -628,7 +642,7 @@ namespace Siprix
             if(tone == 10) { receivedDtmf_ += '*'; }else
             if(tone == 11) { receivedDtmf_ += '#'; }
             else           { receivedDtmf_ += tone.ToString(); }
-            NotifyPropertyChanged("ReceivedDtmf");
+            NotifyPropertyChanged(nameof(ReceivedDtmf));
         }
 
         public void OnCallHeld(HoldState holdState)
@@ -639,8 +653,22 @@ namespace Siprix
 
         public void OnCallSwitched()
         {
-            NotifyPropertyChanged("IsSwitchedCall");
-            NotifyPropertyChanged("CanSwitchTo");            
+            NotifyPropertyChanged(nameof(IsSwitchedCall));
+            NotifyPropertyChanged(nameof(CanSwitchTo));
+        }
+
+        public void OnPlayerState(uint playerId, PlayerState state)
+        {
+            if (playerIds_.Contains(playerId)) return;
+            
+            if((state == PlayerState.PlayerStopped) || (state == PlayerState.PlayerFailed))
+                playerIds_.Remove(playerId);
+
+            bool prevPlayingState = isFilePlaying_;
+            isFilePlaying_ = playerIds_.Count > 0;
+
+            if(prevPlayingState != isFilePlaying_)
+                NotifyPropertyChanged(nameof(IsFilePlaying));
         }
 
     }//CallModel
@@ -649,25 +677,15 @@ namespace Siprix
     /////////////////////////////////////////////////////////////////
     /// CallsListModel
 
-    public class CallsListModel : INotifyPropertyChanged
+    public class CallsListModel(ObjModel parent) : INotifyPropertyChanged
     {
         public event PropertyChangedEventHandler? PropertyChanged;
-        ObservableCollection<CallModel> collection_;
-        readonly ObjModel parent_;
+        readonly ObservableCollection<CallModel> collection_ = new();
+        readonly ObjModel parent_ = parent;
 
         CallModel? switchedCall_;
-        uint lastIncomingCallId_;
-        bool confModeStarted_;
-
-        public CallsListModel(ObjModel parent)
-        {
-            collection_ = new ObservableCollection<CallModel>();
-            parent_ = parent;
-
-            switchedCall_ = null;
-            lastIncomingCallId_ = Siprix.Module.kInvalidId;
-            confModeStarted_ = false;
-        }
+        uint lastIncomingCallId_ = Siprix.Module.kInvalidId;
+        bool confModeStarted_ = false;
 
         public ObservableCollection<CallModel> Collection { get { return collection_; } }
 
@@ -703,8 +721,6 @@ namespace Siprix
         public int Invite(Siprix.DestData dest)
         {
             parent_.Logs?.Print($"Trying to invite {dest.ToExt} from account:{dest.FromAccId}");
-            //CallModel c = new CallModel(1, "111@172.30.30.50", "222", true, true, false, module_, logsModel_);
-            //collection_.Add(c);
 
             int err = parent_.Module.Call_Invite(dest);
             if (err != Siprix.Module.kNoErr)
@@ -716,7 +732,7 @@ namespace Siprix
             String accUri       = parent_.Accounts.getUri(dest.FromAccId);
             bool hasSecureMedia = parent_.Accounts.hasSecureMedia(dest.FromAccId);
 
-            CallModel newCall = new CallModel(dest.MyCallId, accUri, dest.ToExt, false, hasSecureMedia, dest.WithVideo, parent_);
+            CallModel newCall = new(dest.MyCallId, accUri, dest.ToExt, false, hasSecureMedia, dest.WithVideo, parent_);
             collection_.Add(newCall);
             //_cdrs?.add(newCall);             //TODO add CDR
             
@@ -769,7 +785,7 @@ namespace Siprix
             return counter > 1;
         }
 
-        void setLastIncomingCallId(uint id) { lastIncomingCallId_ = id; NotifyPropertyChanged("LastIncomingCallId"); }
+        void setLastIncomingCallId(uint id) { lastIncomingCallId_ = id; NotifyPropertyChanged(nameof(LastIncomingCallId)); }
 
 
         //Events raised by SDK
@@ -783,14 +799,13 @@ namespace Siprix
             String accUri       = parent_.Accounts.getUri(accId);
             bool hasSecureMedia = parent_.Accounts.hasSecureMedia(accId);
 
-            CallModel newCall = new CallModel(callId, accUri, parseExt(hdrFrom), true, hasSecureMedia, withVideo, parent_);
+            CallModel newCall = new(callId, accUri, parseExt(hdrFrom), true, hasSecureMedia, withVideo, parent_);
             newCall.setDisplName(parseDisplayName(hdrFrom));
             collection_.Add(newCall);
 
             setLastIncomingCallId(callId);
 
-            if (SwitchedCall == null)
-                SwitchedCall = newCall;
+            SwitchedCall ??= newCall;//Set new value only when current one is null
 
             //_cdrs?.add(newCall);
             //_postResolveContactName(newCall); //TODO add '_postResolveContactName'
@@ -876,6 +891,13 @@ namespace Siprix
             foreach (var c in collection_) c.OnCallSwitched();
         }
 
+        public void OnPlayerState(uint playerId, PlayerState state)
+        {
+            parent_.Logs?.Print($"onPlayerState playerId:{playerId} state:{state}");
+
+            foreach (var c in collection_) c.OnPlayerState(playerId, state);
+        }
+
         static String parseExt(String uri)
         {
             //URI format: "displName" <sip:EXT@domain:port>
@@ -902,12 +924,10 @@ namespace Siprix
     /////////////////////////////////////////////////////////////////
     /// NetworkModel
 
-    public class NetworkModel : INotifyPropertyChanged
+    public class NetworkModel(ObjModel parent) : INotifyPropertyChanged
     {
-        readonly ObjModel parent_;
+        readonly ObjModel parent_ = parent;
         public event PropertyChangedEventHandler? PropertyChanged;
-
-        public NetworkModel(ObjModel parent)   { parent_ = parent; }
 
         public bool NetworkLost { get; private set; }
 
@@ -916,7 +936,7 @@ namespace Siprix
         {
             parent_.Logs?.Print($"onNetworkStateChanged name:{name} {state}");
             NetworkLost = (state == NetworkState.NetworkLost);
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("NetworkLost"));
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(NetworkLost)));
         }
 
     }//NetworkModel
@@ -936,7 +956,7 @@ namespace Siprix
             this.logText_ += DateTime.Now.ToString("HH:mm:ss ");
             this.logText_ += text;            
             this.logText_ += System.Environment.NewLine;
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("LogText"));
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(LogText)));
         }
 
         public void OnTrialModeNotified()
@@ -951,24 +971,21 @@ namespace Siprix
     /////////////////////////////////////////////////////////////////
     /// ObjModel
 
-    public class ObjModel : Siprix.IEventDelegate
+    public class ObjModel
     {
-        AccountsListModel accountsListModel_;
-        CallsListModel callsListModel_;
-        NetworkModel networkModel_;
-        LogsModel? logsModel_;
+        readonly AccountsListModel accountsListModel_;
+        readonly CallsListModel callsListModel_;
+        readonly NetworkModel networkModel_;
+        readonly LogsModel? logsModel_;
 
-        Siprix.Module module_;
+        readonly Siprix.Module module_ = new();//Create module
 
-        AppDispatcher? dispatcher_;
+        private SiprixEventsHandler? eventHandler_;
 
         static ObjModel? instance = null;
 
         ObjModel()
         {
-            //Create module
-            module_ = new Siprix.Module();
-
             //Create models
             logsModel_ = new LogsModel();
             accountsListModel_ = new AccountsListModel(this);
@@ -987,10 +1004,7 @@ namespace Siprix
         {
             get 
             {
-                if (instance == null)
-                {
-                    instance = new ObjModel();
-                }
+                instance ??= new ObjModel();
                 return instance;
             }
         }
@@ -999,17 +1013,17 @@ namespace Siprix
         {
             if (module_.IsInitialized())
                 return;
-            
-            dispatcher_ = dispatcher;
 
-            Siprix.IniData iniData = new Siprix.IniData();
+            eventHandler_ = new SiprixEventsHandler(this, dispatcher);
+
+            Siprix.IniData iniData = new();
             iniData.License = "...license-credentials...";
             iniData.SingleCallMode = false;
             iniData.LogLevelIde = Siprix.LogLevel.Debug;
             iniData.LogLevelFile = Siprix.LogLevel.Debug;
             iniData.WriteDmpUnhandledExc = true;
     
-            int err = module_.Initialize(this, iniData);
+            int err = module_.Initialize(eventHandler_, iniData);
 
             if(err == Siprix.Module.kNoErr){                
                 Logs?.Print("Siprix module initialized successfully");
@@ -1026,7 +1040,7 @@ namespace Siprix
         {
             int err = module_.UnInitialize();
             if (err == Siprix.Module.kNoErr){
-                Logs?.Print("Siprix module uninitialized");                
+                Logs?.Print("Siprix module uninitialized");
             }
             else{
                 Logs?.Print($"Can't uninitialize Siprix module Err: {err} {ErrorText(err)}");
@@ -1038,9 +1052,9 @@ namespace Siprix
             try
             {
                 Logs?.Print("Loading accounts...");
-
+            
                 accountsListModel_.loadFromJson(SampleWpf.Properties.Settings.Default.accounts);
-
+            
                 Logs?.Print($"Loaded {accountsListModel_.Collection.Count} accounts");
             }
             catch (Exception e) {
@@ -1050,9 +1064,9 @@ namespace Siprix
 
         internal void postSaveAccountsChanges()
         {
-            dispatcher_?.BeginInvoke(new Action(() => {
+            eventHandler_?.dispatcher_?.BeginInvoke(new Action(() => {
                 string jsonStr = accountsListModel_.storeToJson();
-
+            
                 SampleWpf.Properties.Settings.Default.accounts = jsonStr;
                 SampleWpf.Properties.Settings.Default.Save();
             }));
@@ -1060,112 +1074,120 @@ namespace Siprix
 
         internal void postResolveContactName_(CallModel newCall)
         {
-            dispatcher_?.BeginInvoke(new Action(() => {
+            eventHandler_?.dispatcher_?.BeginInvoke(new Action(() => {
                 //string str = newCall.NameAndExt;
-                //TODO add 'ResolveContactName'    
-                //newCall.setDisplName                
+                //TODO add 'ResolveContactName'
+                //newCall.setDisplName
             }));
         }
 
 
-        //Event raised by SDK
-        public void OnTrialModeNotified()
+        //Events raised by SDK
+        class SiprixEventsHandler(ObjModel parent, AppDispatcher dispatcher) : Siprix.IEventDelegate
         {
-            dispatcher_?.BeginInvoke(new Action(() => {
-                logsModel_?.OnTrialModeNotified();
-            }));            
-        }
+            readonly public AppDispatcher dispatcher_ = dispatcher;
+            readonly ObjModel parent_ = parent;
 
-        public void OnDevicesAudioChanged()
-        {
-            //TODO add
-        }
+            public void OnTrialModeNotified()
+            {
+                dispatcher_?.BeginInvoke(new Action(() => {
+                    parent_.logsModel_?.OnTrialModeNotified();
+                }));
+            }
 
-        public void OnAccountRegState(uint accId, RegState state, string response)
-        {
-            dispatcher_?.BeginInvoke(new Action(() => {
-                accountsListModel_.OnAccountRegState(accId, state, response);
-            }));
-        }
+            public void OnDevicesAudioChanged()
+            {
+                //TODO add
+            }
 
-        public void OnNetworkState(string name, NetworkState state)
-        {
-            dispatcher_?.BeginInvoke(new Action(() => {
-                networkModel_.OnNetworkStateChanged(name, state);
-            }));
-        }
+            public void OnAccountRegState(uint accId, RegState state, string response)
+            {
+                dispatcher_?.BeginInvoke(new Action(() => {
+                    parent_.accountsListModel_.OnAccountRegState(accId, state, response);
+                }));
+            }
 
-        public void OnPlayerState(uint playerId, PlayerState state)
-        {
-            //TODO add
-        }
+            public void OnNetworkState(string name, NetworkState state)
+            {
+                dispatcher_?.BeginInvoke(new Action(() => {
+                    parent_.networkModel_.OnNetworkStateChanged(name, state);
+                }));
+            }
 
-        public void OnRingerState(bool start)
-        {
-        }
+            public void OnPlayerState(uint playerId, PlayerState state)
+            {
+                dispatcher_?.BeginInvoke(new Action(() => {
+                    parent_.callsListModel_.OnPlayerState(playerId, state);
+                }));
+            }
 
-        public void OnCallIncoming(uint callId, uint accId, bool withVideo, string hdrFrom, string hdrTo)
-        {
-            dispatcher_?.BeginInvoke(new Action(() => {
-                callsListModel_.OnCallIncoming(callId, accId, withVideo, hdrFrom, hdrTo);
-            }));
-        }
+            public void OnRingerState(bool start)
+            {
+            }
 
-        public void OnCallConnected(uint callId, string hdrFrom, string hdrTo, bool withVideo)
-        {
-            dispatcher_?.BeginInvoke(new Action(() => {
-                callsListModel_.OnCallConnected(callId, hdrFrom, hdrTo, withVideo);
-            }));
-        }
+            public void OnCallIncoming(uint callId, uint accId, bool withVideo, string hdrFrom, string hdrTo)
+            {
+                dispatcher_?.BeginInvoke(new Action(() => {
+                    parent_.callsListModel_.OnCallIncoming(callId, accId, withVideo, hdrFrom, hdrTo);
+                }));
+            }
 
-        public void OnCallTerminated(uint callId, uint statusCode)
-        {
-            dispatcher_?.BeginInvoke(new Action(() => {
-                callsListModel_.OnCallTerminated(callId, statusCode);
-            }));
-        }
+            public void OnCallConnected(uint callId, string hdrFrom, string hdrTo, bool withVideo)
+            {
+                dispatcher_?.BeginInvoke(new Action(() => {
+                    parent_.callsListModel_.OnCallConnected(callId, hdrFrom, hdrTo, withVideo);
+                }));
+            }
 
-        public void OnCallProceeding(uint callId, string response)
-        {
-            dispatcher_?.BeginInvoke(new Action(() => {
-                callsListModel_.OnCallProceeding(callId, response);
-            }));
-        }
+            public void OnCallTerminated(uint callId, uint statusCode)
+            {
+                dispatcher_?.BeginInvoke(new Action(() => {
+                    parent_.callsListModel_.OnCallTerminated(callId, statusCode);
+                }));
+            }
 
-        public void OnCallTransferred(uint callId, uint statusCode)
-        {
-            dispatcher_?.BeginInvoke(new Action(() => {
-                callsListModel_.OnCallTransferred(callId, statusCode);
-            }));
-        }
+            public void OnCallProceeding(uint callId, string response)
+            {
+                dispatcher_?.BeginInvoke(new Action(() => {
+                    parent_.callsListModel_.OnCallProceeding(callId, response);
+                }));
+            }
 
-        public void OnCallRedirected(uint origCallId, uint relatedCallId, string referTo)
-        {
-            dispatcher_?.BeginInvoke(new Action(() => {
-                callsListModel_.OnCallRedirected(origCallId, relatedCallId, referTo);
-            }));
-        }
+            public void OnCallTransferred(uint callId, uint statusCode)
+            {
+                dispatcher_?.BeginInvoke(new Action(() =>{
+                    parent_.callsListModel_.OnCallTransferred(callId, statusCode);
+                }));
+            }
 
-        public void OnCallDtmfReceived(uint callId, ushort tone)
-        {
-            dispatcher_?.BeginInvoke(new Action(() => {
-                callsListModel_.OnCallDtmfReceived(callId, tone);
-            }));
-        }
+            public void OnCallRedirected(uint origCallId, uint relatedCallId, string referTo)
+            {
+                dispatcher_?.BeginInvoke(new Action(() => {
+                    parent_.callsListModel_.OnCallRedirected(origCallId, relatedCallId, referTo);
+                }));
+            }
 
-        public void OnCallHeld(uint callId, HoldState state)
-        {
-            dispatcher_?.BeginInvoke(new Action(() => {
-                callsListModel_.OnCallHeld(callId, state);
-            }));
-        }
+            public void OnCallDtmfReceived(uint callId, ushort tone)
+            {
+                dispatcher_?.BeginInvoke(new Action(() => {
+                    parent_.callsListModel_.OnCallDtmfReceived(callId, tone);
+                }));
+            }
 
-        public void OnCallSwitched(uint callId)
-        {
-            dispatcher_?.BeginInvoke(new Action(() => {
-                callsListModel_.OnCallSwitched(callId);
-            }));
-        }       
+            public void OnCallHeld(uint callId, HoldState state)
+            {
+                dispatcher_?.BeginInvoke(new Action(() => {
+                    parent_.callsListModel_.OnCallHeld(callId, state);
+                }));
+            }
+
+            public void OnCallSwitched(uint callId)
+            {
+                dispatcher_?.BeginInvoke(new Action(() => {
+                    parent_.callsListModel_.OnCallSwitched(callId);
+                }));
+            }
+        }
 
     }//ObjModel
 
@@ -1173,25 +1195,20 @@ namespace Siprix
 
     /// A command whose sole purpose is to relay its functionality to other
     /// objects by invoking delegates.
-    public class RelayCommand : ICommand
+    public class RelayCommand(Action execute, Func<bool>? canExecute = null) : ICommand
     {   
-        readonly Func<bool>? canExecute_;
-        readonly Action      execute_;
-
-        public RelayCommand(Action execute, Func<bool>? canExecute = null)
-        {
-            execute_    = execute;
-            canExecute_ = canExecute;
-        }
+        readonly Func<bool>? canExecute_ = canExecute;
+        readonly Action execute_ = execute;
 
         [DebuggerStepThrough]
         public bool CanExecute(object? parameter)
         {
-            return canExecute_ == null ? true : canExecute_();
+            return (canExecute_ == null) || canExecute_();
         }
 
         public event EventHandler? CanExecuteChanged
         {
+#if WPF_PROJECT
             add{
                 if (canExecute_ != null)
                     CommandManager.RequerySuggested += value;
@@ -1200,6 +1217,12 @@ namespace Siprix
                 if (canExecute_ != null)
                     CommandManager.RequerySuggested -= value;
             }
+#else
+            add{
+            }
+            remove{
+            }
+#endif
         }
 
         public void Execute(object? parameter)
