@@ -16,9 +16,10 @@ namespace SampleWpf
         enum UiMode { eUndef, eMain, eDtmf, eTransferBlind, eTranferAtt };
 
         CallModel? callModel_;
-        Dictionary<CallState, UiMode> uiModes_ = new Dictionary<CallState, UiMode>();
-        System.Windows.Threading.DispatcherTimer callDurationTimer_;
-        VideoControlHost receivedVideoHost_, previewVideoHost_;
+        readonly Dictionary<CallState, UiMode> uiModes_ = new();
+        readonly System.Windows.Threading.DispatcherTimer callDurationTimer_ = new();
+        readonly VideoControlHost receivedVideoHost_ = new();
+        readonly VideoControlHost previewVideoHost_ = new();
 
         public CallControl()
         {
@@ -28,12 +29,9 @@ namespace SampleWpf
 
             Siprix.ObjModel.Instance.Calls.PropertyChanged += onCalls_PropertyChanged;
 
-            callDurationTimer_ = new System.Windows.Threading.DispatcherTimer();
             callDurationTimer_.Tick += onCallDurationTimer_Tick;
             callDurationTimer_.Interval = TimeSpan.FromSeconds(1);
 
-            receivedVideoHost_ = new VideoControlHost();
-            previewVideoHost_ = new VideoControlHost();
             receivedVideo.Child = receivedVideoHost_;
             previewVideo.Child = previewVideoHost_;
         }
@@ -108,9 +106,9 @@ namespace SampleWpf
             spDetails.Visibility    = (callModel_ == null) ? Visibility.Collapsed : Visibility.Visible;
 
             //Ringing
-            bool isConnected = (callModel_ == null) ? false : callModel_.IsConnected;
-            bool isRinging   = (callModel_ == null) ? false : callModel_.IsRinging;
-            bool isVideo     = (callModel_ == null) ? false : callModel_.WithVideo;
+            bool isConnected = (callModel_ != null) && callModel_.IsConnected;
+            bool isRinging   = (callModel_ != null) && callModel_.IsRinging;
+            bool isVideo     = (callModel_ != null) && callModel_.WithVideo;
             spAcceptReject.Visibility = isRinging   ? Visibility.Visible : Visibility.Collapsed;
             bnDtmfMode.Visibility     = isConnected ? Visibility.Visible : Visibility.Collapsed;
 
@@ -182,8 +180,15 @@ namespace SampleWpf
         {
             callModel_?.TransferBlind(tbTransferToExt.Text);
         }
-        
-       
+
+        private void PlayFile_Click(object sender, RoutedEventArgs e)
+        {
+            if ((callModel_ == null)|| callModel_.IsFilePlaying) return;
+
+            string pathToDemoFile = AppDomain.CurrentDomain.BaseDirectory + "Resources\\music.mp3";
+            callModel_.PlayFile(pathToDemoFile, false);
+        }
+
         private void ButtonMenu_Click(object sender, RoutedEventArgs e)
         {
             System.Windows.Controls.Button? btn = sender as System.Windows.Controls.Button;
@@ -201,7 +206,7 @@ namespace SampleWpf
 
         private void AddCall_Click(object sender, RoutedEventArgs e)
         {
-            AddCallWindow wnd = new AddCallWindow();
+            AddCallWindow wnd = new();
             wnd.Owner = App.Current.MainWindow;
             wnd.ShowDialog();
         }

@@ -266,7 +266,7 @@
 
                         <Separator />
 
-                        <MenuItem Header="Play File" Height="24"  IsEnabled="False">
+                        <MenuItem Header="Play File" Height="24"  Click="PlayFile_Click">
                             <MenuItem.Icon>
                                 <TextBlock Text="{x:Static local:Icons.play_arrow}" FontFamily="{StaticResource MaterialIconsRegular}"  FontSize="16" />
                             </MenuItem.Icon>
