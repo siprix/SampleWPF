@@ -19,10 +19,11 @@ Application's UI may not contain all the features, avialable in the SDK, they wi
 
 ## Limitations
 
-Siprix doesn't provider VoIP services. For testing app you need an account(s) credentials from a SIP service provider(s). 
+Siprix doesn't have any limitations and can work with all existing servers (PBX) supported SIP.
+For testing app you need an account(s) credentials from a SIP service provider(s).
 Some features may be not supported by all SIP providers.
 
-Attached Siprix SDK works in trial mode and has limited call duration - it drops call after 60sec.
+Included Siprix SDK works in trial mode and has limited call duration - it drops call after 60sec.
 Upgrading to a paid license removes this restriction, enabling calls of any length.
 
 Please contact [sales@siprix-voip.com](mailto:sales@siprix-voip.com) for more details.
@@ -34,7 +35,7 @@ Product web site: https://siprix-voip.com
 Manual: https://docs.siprix-voip.com
 
 
-## Screeshots
+## Screenshots
 
 <a href="https://docs.siprix-voip.com/screenshots/SampleWPF-Accounts.PNG"  title="Accounts screenshot">
 <img src="https://docs.siprix-voip.com/screenshots/SampleWPF-Accounts_Mini.png" width="50"></a>,<a href="https://docs.siprix-voip.com/screenshots/SampleWPF-Calls.PNG"  title="Calls screenshot">
