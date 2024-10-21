@@ -15,6 +15,7 @@ namespace Siprix
     [Flags]
     public enum LogLevel : byte
     {
+        Stack = 0,
         Debug = 1,
         Info = 2,
         Warning = 3,
@@ -67,7 +68,8 @@ namespace Siprix
     {
         H264 = 80,
         VP8 = 81,
-        VP9 = 82
+        VP9 = 82,
+        AV1 = 83
     };
 
 
@@ -205,25 +207,25 @@ namespace Siprix
         const string DllName = "siprix.dll";
         
         public const ErrorCode kNoErr = 0;
-        public const uint kInvalidId = 0;                
+        public const uint kInvalidId = 0;
 
-        private OnTrialModeNotified   onTrialModeNotified_;
-        private OnDevicesAudioChanged onDevicesAudioChanged_;
+        private readonly OnTrialModeNotified   onTrialModeNotified_;
+        private readonly OnDevicesAudioChanged onDevicesAudioChanged_;
 
-        private OnAccountRegState     onAccountRegState_;
-        private OnNetworkState        onNetworkState_;
-        private OnPlayerState         onPlayerState_;
-        private OnRingerState         onRingerState_;
+        private readonly OnAccountRegState     onAccountRegState_;
+        private readonly OnNetworkState        onNetworkState_;
+        private readonly OnPlayerState         onPlayerState_;
+        private readonly OnRingerState         onRingerState_;
 
-        private OnCallIncoming        onCallIncoming_;
-        private OnCallConnected       onCallConnected_;
-        private OnCallTerminated      onCallTerminated_;
-        private OnCallProceeding      onCallProceeding_;
-        private OnCallTransferred     onCallTransferred_;
-        private OnCallRedirected      onCallRedirected_;
-        private OnCallDtmfReceived    onCallDtmfReceived_;
-        private OnCallHeld            onCallHeld_;
-        private OnCallSwitched        onCallSwitched_;
+        private readonly OnCallIncoming        onCallIncoming_;
+        private readonly OnCallConnected       onCallConnected_;
+        private readonly OnCallTerminated      onCallTerminated_;
+        private readonly OnCallProceeding      onCallProceeding_;
+        private readonly OnCallTransferred     onCallTransferred_;
+        private readonly OnCallRedirected      onCallRedirected_;
+        private readonly OnCallDtmfReceived    onCallDtmfReceived_;
+        private readonly OnCallHeld            onCallHeld_;
+        private readonly OnCallSwitched        onCallSwitched_;
 
         public Module()
         {
@@ -280,7 +282,7 @@ namespace Siprix
             if(err != kNoErr) return err;
             
             eventDelegate_ = eventDelegate;
-                            
+
             Callback_SetTrialModeNotified(modulePtr_,    onTrialModeNotified_);
             Callback_SetDevicesAudioChanged(modulePtr_,  onDevicesAudioChanged_);
 
@@ -369,7 +371,7 @@ namespace Siprix
             return Call_Invite(modulePtr_, getNative(dest), ref dest.MyCallId);
         }
 
-        public ErrorCode Call_Reject(CallId callId, uint statusCode)
+        public ErrorCode Call_Reject(CallId callId, uint statusCode=486)
         {
             return Call_Reject(modulePtr_, callId, statusCode);
         }
@@ -387,6 +389,19 @@ namespace Siprix
         public ErrorCode Call_GetHoldState(CallId callId, ref HoldState state)
         {
             return Call_GetHoldState(modulePtr_, callId, ref state);
+        }
+
+        public string Call_GetSipHeader(CallId callId, string hdrName)
+        {
+            uint hdrValLen = 0;
+            Call_GetSipHeader(modulePtr_, callId, hdrName, null, ref hdrValLen);
+            if (hdrValLen > 0)
+            {
+                var sb = new StringBuilder((int)(hdrValLen+1));
+                Call_GetSipHeader(modulePtr_, callId, hdrName, sb, ref hdrValLen);
+                return sb.ToString();
+            }
+            else return string.Empty;
         }
 
         public ErrorCode Call_MuteMic(CallId callId, bool mute)
@@ -707,8 +722,12 @@ namespace Siprix
         [DllImport(DllName)]
         private static extern ErrorCode Call_GetHoldState(IntPtr module, CallId callId, ref HoldState state);
         [DllImport(DllName)]
+        private static extern ErrorCode Call_GetSipHeader(IntPtr module, CallId callId,
+                                [MarshalAs(UnmanagedType.LPUTF8Str)] string hdrName,
+                                [MarshalAs(UnmanagedType.LPStr)] StringBuilder? hdrVal, 
+                                ref uint hdrValLen);
+        [DllImport(DllName)]
         private static extern ErrorCode Call_MuteMic(IntPtr module, CallId callId, bool mute);
-
         [DllImport(DllName)]
         private static extern ErrorCode Call_MuteCam(IntPtr module, CallId callId, bool mute);
         [DllImport(DllName)]

@@ -524,7 +524,7 @@ namespace Siprix
         public int Reject()
         {
             parent_.Logs?.Print($"Rejecting callId:{myCallId_}");
-            int err = parent_.Module.Call_Reject(myCallId_, 486);//Send '486 Busy now'
+            int err = parent_.Module.Call_Reject(myCallId_);//Send '486 Busy now'
             if (err == Siprix.Module.kNoErr) setCallState(CallState.Rejecting);
             else parent_.Logs?.Print($"Cant Reject callId:{myCallId_} Err:{err} {parent_.ErrorText(err)}");
             return err;
@@ -616,6 +616,11 @@ namespace Siprix
         {
             parent_.Logs?.Print($"SetVideoWindow callId:{myCallId_} hwnd:{hwnd}");
             return parent_.Module.Call_SetVideoWindow(myCallId_, hwnd);
+        }
+
+        public string GetSipHeader(string hdrName)
+        {
+            return parent_.Module.Call_GetSipHeader(myCallId_, hdrName);
         }
 
         //Events raised by SDK
