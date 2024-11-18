@@ -314,6 +314,13 @@ namespace Siprix
             return (modulePtr_ != IntPtr.Zero) ? Module_IsInitialized(modulePtr_) : false;
         }
 
+        public string HomeFolder()
+        {
+            IntPtr strPtr = (modulePtr_ != IntPtr.Zero) ? Module_HomeFolder(modulePtr_) : 0;
+            string? path = Marshal.PtrToStringUTF8(strPtr);
+            return (path == null) ? "" : path;
+        }
+
         public string Version()
         {
             IntPtr strPtr = (modulePtr_ != IntPtr.Zero) ? Module_Version(modulePtr_) : 0;
@@ -484,6 +491,8 @@ namespace Siprix
         [DllImport(DllName)]
         private static extern bool Module_IsInitialized(IntPtr modulePtr);
         [DllImport(DllName)]        
+        private static extern IntPtr Module_HomeFolder(IntPtr modulePtr);
+        [DllImport(DllName)]
         private static extern IntPtr Module_Version(IntPtr modulePtr);
         [DllImport(DllName)]
         private static extern uint Module_VersionCode(IntPtr modulePtr);
