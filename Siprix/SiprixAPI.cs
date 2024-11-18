@@ -158,6 +158,7 @@ namespace Siprix
         public string?        TranspBindAddr;
         public bool?          TranspPreferIPv6;
         public bool?          RewriteContactIp;
+        public bool?          VerifyIncomingCall;
         
         public List<AudioCodec>? AudioCodecs;
         public List<VideoCodec>? VideoCodecs;
@@ -602,6 +603,10 @@ namespace Siprix
         private static extern void Acc_SetRewriteContactIp(IntPtr acc, bool enabled);
 
         [DllImport(DllName)]
+        private static extern void Acc_SetVerifyIncomingCall(IntPtr acc, bool enabled);
+
+
+        [DllImport(DllName)]
         private static extern void Acc_AddAudioCodec(IntPtr acc, AudioCodec codec);
         [DllImport(DllName)]
         private static extern void Acc_AddVideoCodec(IntPtr acc, VideoCodec codec);
@@ -637,6 +642,7 @@ namespace Siprix
             if (accData.TranspBindAddr    != null) Acc_SetTranspBindAddr(ptr,     accData.TranspBindAddr);
             if (accData.TranspPreferIPv6  != null) Acc_SetTranspPreferIPv6(ptr,   accData.TranspPreferIPv6.Value);
             if (accData.RewriteContactIp  != null) Acc_SetRewriteContactIp(ptr,   accData.RewriteContactIp.Value);
+            if (accData.VerifyIncomingCall!= null) Acc_SetVerifyIncomingCall(ptr, accData.VerifyIncomingCall.Value);
 
             if (accData.AudioCodecs != null)
             {
