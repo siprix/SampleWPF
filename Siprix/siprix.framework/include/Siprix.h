@@ -22,11 +22,13 @@ namespace Siprix {
 typedef uint32_t AccountId;
 typedef uint32_t CallId;
 typedef uint32_t PlayerId;
+typedef uint32_t SubscriptionId;
 
 struct AccData;
 struct IniData;
 struct DestData;
 struct VideoData;
+struct SubscrData;
 
 class ISiprixModule;
 
@@ -51,6 +53,7 @@ enum ErrorCode : int32_t
     EAccountHasCalls     = -1023,
     EAccountDoenstMatch  = -1024,
     ESingleAccountMode   = -1025,
+    EAccountHasSubscr    = -1026,
 
     EDestNumberEmpty     = -1030,
     EDestNumberSpaces    = -1031,
@@ -81,6 +84,11 @@ enum ErrorCode : int32_t
 
     EBadDeviceIndex      = -1070,
 
+    EEventTypeCantBeEmpty= -1080,
+    ESubTypeCantBeEmpty  = -1081,
+    ESubscrDoesntExist   = -1082,
+    ESubscrAlreadyExist  = -1083,
+
     EMicPermRequired     = -1111
 };
 
@@ -100,6 +108,13 @@ enum RegState : uint8_t
     Failed,    //Registration failed
     Removed,   //Registration removed
     InProgress
+};
+
+enum SubscriptionState : uint8_t
+{
+    Created=0,
+    Updated,
+    Destroyed
 };
 
 enum SecureMedia : uint8_t
@@ -173,6 +188,7 @@ typedef void(*OnDevicesAudioChanged)();
 typedef void(*OnTrialModeNotified)();
 
 typedef void(*OnAccountRegState)(AccountId accId, RegState state, const char* response);
+typedef void(*OnSubscriptionState)(SubscriptionId subId, SubscriptionState state, const char* response);
 typedef void(*OnNetworkState)(const char* name, NetworkState state);
 typedef void(*OnPlayerState)(PlayerId playerId, PlayerState state);
 typedef void(*OnRingerState)(bool start);
@@ -199,6 +215,7 @@ public:
     virtual void OnDevicesAudioChanged() = 0;
         
     virtual void OnAccountRegState(AccountId accId, RegState state, const char* response) = 0;    
+    virtual void OnSubscriptionState(SubscriptionId subId, SubscriptionState state, const char* response) = 0;
     virtual void OnNetworkState(const char* name, NetworkState state) = 0;
     virtual void OnPlayerState(PlayerId playerId, PlayerState state) = 0;
     virtual void OnRingerState(bool started) = 0;
@@ -255,6 +272,7 @@ EXPORT ISiprixModule* Module_Create();
 EXPORT ErrorCode   Module_Initialize(ISiprixModule* module, IniData* ini);
 EXPORT ErrorCode   Module_UnInitialize(ISiprixModule* module);
 EXPORT bool        Module_IsInitialized(ISiprixModule* module);
+EXPORT const char* Module_HomeFolder(ISiprixModule* module);
 EXPORT const char* Module_Version(ISiprixModule* module);
 EXPORT uint32_t    Module_VersionCode(ISiprixModule* module);
 
@@ -300,6 +318,11 @@ EXPORT ErrorCode Mixer_SwitchToCall(ISiprixModule* module, CallId callId);
 EXPORT ErrorCode Mixer_MakeConference(ISiprixModule* module);
 
 ////////////////////////////////////////////////////////////////////////////
+//Subscription
+EXPORT ErrorCode Subscription_Create(ISiprixModule* module, SubscrData* data, SubscriptionId* subscriptionId);
+EXPORT ErrorCode Subscription_Destroy(ISiprixModule* module, SubscriptionId subscriptionId);
+
+////////////////////////////////////////////////////////////////////////////
 //Devices (audio/video/net)
 EXPORT ErrorCode Dvc_GetPlayoutDevices(ISiprixModule* module, uint32_t* numberOfDevices);
 EXPORT ErrorCode Dvc_GetRecordingDevices(ISiprixModule* module, uint32_t* numberOfDevices);
@@ -325,6 +348,7 @@ EXPORT ErrorCode Callback_SetTrialModeNotified(ISiprixModule* module, OnTrialMod
 EXPORT ErrorCode Callback_SetDevicesAudioChanged(ISiprixModule* module, OnDevicesAudioChanged callback);
 
 EXPORT ErrorCode Callback_SetAccountRegState(ISiprixModule* module, OnAccountRegState callback);
+EXPORT ErrorCode Callback_SetSubscriptionState(ISiprixModule* module, OnSubscriptionState callback);
 EXPORT ErrorCode Callback_SetNetworkState(ISiprixModule* module, OnNetworkState callback);
 EXPORT ErrorCode Callback_SetPlayerState(ISiprixModule* module, OnPlayerState callback);
 EXPORT ErrorCode Callback_SetRingerState(ISiprixModule* module, OnRingerState callback);
@@ -350,6 +374,7 @@ EXPORT void     Acc_SetSipAuthId(AccData* acc, const char* sipAuthId);
 EXPORT void     Acc_SetSipPassword(AccData* acc, const char* sipPassword);
 EXPORT void     Acc_SetExpireTime(AccData* acc, uint32_t expireTime);
 EXPORT void     Acc_SetSipProxyServer(AccData* acc, const char* sipProxyServer);
+EXPORT void     Acc_SetForceSipProxy(AccData* acc, bool forceForAllRequests);
 
 EXPORT void     Acc_SetStunServer(AccData* acc, const char* stunServer);
 EXPORT void     Acc_SetTurnServer(AccData* acc, const char* turnServer);
@@ -376,6 +401,7 @@ EXPORT void     Acc_SetTranspPreferIPv6(AccData* acc, bool prefer);
 EXPORT void     Acc_AddXHeader(AccData* acc, const char* header, const char* value);
 EXPORT void     Acc_AddXContactUriParam(AccData* acc, const char* param, const char* value);
 EXPORT void     Acc_SetRewriteContactIp(AccData* acc, bool enabled);
+EXPORT void     Acc_SetVerifyIncomingCall(AccData* acc, bool enabled);
 
 EXPORT void     Acc_AddAudioCodec(AccData* acc, AudioCodec codec);
 EXPORT void     Acc_AddVideoCodec(AccData* acc, VideoCodec codec);
@@ -416,6 +442,16 @@ EXPORT void     Vdo_SetFramerate(VideoData* vdo, int fps);
 EXPORT void     Vdo_SetBitrate(VideoData* vdo, int bitrateKbps);
 EXPORT void     Vdo_SetHeight(VideoData* vdo, int height);
 EXPORT void     Vdo_SetWidth(VideoData* vdo, int width);
+
+////////////////////////////////////////////////////////////////////////////
+//Set fields of SubscrData
+EXPORT SubscrData* Subscr_GetBLF();
+EXPORT SubscrData* Subscr_GetDefault();
+EXPORT void     Subscr_SetExtension(SubscrData* sub, const char* extension);
+EXPORT void     Subscr_SetAccountId(SubscrData* sub, AccountId accId);
+EXPORT void     Subscr_SetMimeSubtype(SubscrData* sub, const char* subtype);
+EXPORT void     Subscr_SetEventType(SubscrData* sub, const char* type);
+EXPORT void     Subscr_SetExpireTime(SubscrData* sub, uint32_t expireTime);
 
 ////////////////////////////////////////////////////////////////////////////
 //Get error text
