@@ -144,6 +144,7 @@ namespace Siprix
             if (accData_.TranspBindAddr    != null) dict.Add("TranspBindAddr",    accData_.TranspBindAddr);
             if (accData_.TranspPreferIPv6  != null) dict.Add("TranspPreferIPv6",  accData_.TranspPreferIPv6.Value);
             if (accData_.RewriteContactIp  != null) dict.Add("RewriteContactIp",  accData_.RewriteContactIp.Value);
+            if (accData_.VerifyIncomingCall != null) dict.Add("VerifyIncomingCall", accData_.VerifyIncomingCall.Value);
                                                                                   
             if (accData_.AudioCodecs       != null) dict.Add("AudioCodecs",       accData_.AudioCodecs);
             if (accData_.VideoCodecs       != null) dict.Add("VideoCodecs",       accData_.VideoCodecs);
@@ -244,6 +245,11 @@ namespace Siprix
             set { selAccount_ = value; }
         }
 
+        public uint getAccId(string uri)
+        {
+            var accModel = collection_.Where(a => a.Uri == uri).FirstOrDefault();
+            return (accModel == null) ? Siprix.Module.kInvalidId : accModel.ID;
+        }
         public string getUri(uint accId)
         {
             var accModel = collection_.Where(a => a.ID == accId).FirstOrDefault();
@@ -288,7 +294,7 @@ namespace Siprix
             var accModel = collection_.Where(a => a.ID == accId).FirstOrDefault();
             if (accModel == null) return -1;
 
-            int err = 0;//parent_.Module.Account_Delete(accId);
+            int err = parent_.Module.Account_Delete(accId);
             if (err != Siprix.Module.kNoErr)
             {
                 parent_.Logs?.Print($"Can't delete account Err: {err} {parent_.ErrorText(err)}");
@@ -925,6 +931,200 @@ namespace Siprix
 
     }//CallsListModel
 
+    public enum BLFState { Trying, Proceeding, Early, Terminated, Confirmed, Unknown, SubscriptionDestroyed };
+
+    /////////////////////////////////////////////////////////////////
+    /// SubscriptionModel
+
+    public class SubscriptionModel : INotifyPropertyChanged
+    {
+        public event PropertyChangedEventHandler? PropertyChanged;
+        SubscriptionState internalState_ = SubscriptionState.Created;
+        readonly Siprix.SubscrData subData_ = new();
+
+        public static SubscriptionModel BLF()
+        {
+            SubscriptionModel blfModel = new();
+            blfModel.subData_.MimeSubType = "dialog-info+xml";
+            blfModel.subData_.EventType = "dialog";
+            return blfModel;
+        }
+
+        public Siprix.SubscrData Data { get { return subData_; } }
+        public uint ID { get { return subData_.MySubId; } }
+        public string ToExt { get { return subData_.ToExt; } set { subData_.ToExt = value; } }
+        public uint AccId { get { return subData_.FromAccId; } set { subData_.FromAccId = value; } }
+        public bool IsWaiting { get { return (internalState_ == SubscriptionState.Created); } }
+        public bool IsBlinking { get { return (BLFState == BLFState.Early); } }
+        public string AccUri { get; set; } = string.Empty;
+        public string Label { get; set; } = string.Empty;
+        public BLFState BLFState { get; private set; } = BLFState.Unknown;        
+
+        private void NotifyPropertyChanged([CallerMemberName] string propertyName = "")
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+
+        public bool Equals(SubscriptionModel? other) { return (this.ID == other?.ID); }
+
+        //Event raised by SDK
+        public void OnSubscriptionState(SubscriptionState state, string resp)
+        {
+            internalState_ = state;
+
+            //Parse 'response' (contains XML body received in NOTIFY request)
+            // and use parsed attributes for UI rendering
+            int startIndex = resp.IndexOf("<state");
+            if (startIndex != -1)
+            {
+                startIndex = resp.IndexOf(">", startIndex);
+                int endIndex = resp.IndexOf("</state>", startIndex);
+                String blfStateStr = resp.Substring(startIndex + 1, endIndex- startIndex-1);
+                BLFState = blfStateStr switch
+                {
+                    "trying" => BLFState.Trying,
+                    "proceeding" => BLFState.Proceeding,
+                    "early" => BLFState.Early,
+                    "terminated" => BLFState.Terminated,
+                    "confirmed" => BLFState.Confirmed,
+                    _ => BLFState.Unknown,
+                };
+            }
+
+            if (state == SubscriptionState.Destroyed)
+                BLFState = BLFState.SubscriptionDestroyed;
+
+            NotifyPropertyChanged(nameof(BLFState));
+            NotifyPropertyChanged(nameof(IsWaiting));
+            NotifyPropertyChanged(nameof(IsBlinking));
+        }
+
+        public JsonDict storeToJson()
+        {
+            JsonDict dict = new();
+            dict.Add("ToExt",       subData_.ToExt);
+            dict.Add("MimeSubType", subData_.MimeSubType);
+            dict.Add("EventType",   subData_.EventType);            
+            dict.Add("AccUri",      AccUri);
+            dict.Add("Label",       Label);
+
+            if (subData_.ExpireTime != null) dict.Add("ExpireTime", subData_.ExpireTime);
+            return dict;
+
+        }//storeToJson
+
+        public static Siprix.SubscriptionModel loadFromJson(JsonElement elem)
+        {
+            SubscriptionModel m = new();
+
+            foreach (JsonProperty prop in elem.EnumerateObject())
+            {
+                bool isString = (prop.Value.ValueKind == JsonValueKind.String);
+                string strVal = isString ? prop.Value.GetString()! : "";
+
+                switch (prop.Name)
+                {
+                    case "ToExt":       m.subData_.ToExt       = strVal; break;
+                    case "MimeSubType": m.subData_.MimeSubType = strVal; break;                    
+                    case "EventType":   m.subData_.EventType   = strVal; break;
+                    case "ExpireTime":  m.subData_.ExpireTime  = prop.Value.GetUInt32(); break;
+                    case "Label":       m.Label  = strVal; break;
+                    case "AccUri":      m.AccUri = strVal; break;
+                }//switch
+            }//for
+
+            return m;
+
+        }//loadFromJson
+
+    }//SubscriptionModel
+
+
+    /////////////////////////////////////////////////////////////////
+    /// SubscriptionsListModel
+    public class SubscriptionsListModel(ObjModel parent)
+    {
+        readonly ObservableCollection<SubscriptionModel> collection_ = new();
+        readonly ObjModel parent_ = parent;
+
+        public ObservableCollection<SubscriptionModel> Collection { get { return collection_; } }
+
+        public int Add(SubscriptionModel subscr, bool saveChanges = true)
+        {
+            parent_.Logs?.Print($"Adding new subscription ext:{subscr.ToExt} accId:@{subscr.AccId}");
+
+            //When accUri present - model loaded from json, search accId as it might be changed
+            if (subscr.AccUri.Length != 0) { subscr.AccId  = parent_.Accounts.getAccId(subscr.AccUri); }
+            else                           { subscr.AccUri = parent_.Accounts.getUri(subscr.AccId); }
+
+            //Add
+            int err = parent_.Module.Subscription_Add(subscr.Data);
+            if (err != Siprix.Module.kNoErr)
+            {
+                parent_.Logs?.Print($"Can't add subscription Err: {err} {parent_.ErrorText(err)}");
+                return err;
+            }
+
+            collection_.Add(subscr);
+
+            parent_.Logs?.Print($"Added successfully with id: {subscr.ID}");
+            if (saveChanges) parent_.postSaveSubscriptionChanges();
+            return err;
+        }
+
+        public int Delete(uint subId)
+        {
+            var subModel = collection_.Where(a => a.ID == subId).FirstOrDefault();
+            if (subModel == null) return -1;
+
+            int err = parent_.Module.Subscription_Delete(subId);
+            if (err != Siprix.Module.kNoErr)
+            {
+                parent_.Logs?.Print($"Can't delete subscription Err: {err} {parent_.ErrorText(err)}");
+                return err;
+            }
+
+            collection_.Remove(subModel);
+
+            parent_.postSaveSubscriptionChanges();
+
+            parent_.Logs?.Print($"Deleted subscription subId:{subId}");
+            return err;
+        }
+
+        public void OnSubscriptionState(uint subId, SubscriptionState state, string response)
+        {
+            var subModel = collection_.Where(a => a.ID == subId).FirstOrDefault();
+            subModel?.OnSubscriptionState(state, response);
+            parent_.Logs?.Print($"OnSubscriptionState subId:{subId} state:{state} response:{response}");
+        }
+
+        public string storeToJson()
+        {
+            List<JsonDict> jsonAccList = [];
+            foreach (var subModel in collection_)
+            {
+                jsonAccList.Add(subModel.storeToJson());
+            }
+            return JsonSerializer.Serialize(jsonAccList);
+        }
+        public void loadFromJson(string jsonString)
+        {
+            if (jsonString.Length == 0) return;
+
+            collection_.Clear();
+
+            using (JsonDocument document = JsonDocument.Parse(jsonString))
+            {
+                foreach (JsonElement element in document.RootElement.EnumerateArray())
+                {
+                    this.Add(SubscriptionModel.loadFromJson(element), false);
+                }
+            }
+        }
+
+    }//SubscriptionsListModel
+
 
     /////////////////////////////////////////////////////////////////
     /// NetworkModel
@@ -979,6 +1179,7 @@ namespace Siprix
     public class ObjModel
     {
         readonly AccountsListModel accountsListModel_;
+        readonly SubscriptionsListModel subscrListModel_;
         readonly CallsListModel callsListModel_;
         readonly NetworkModel networkModel_;
         readonly LogsModel? logsModel_;
@@ -993,11 +1194,13 @@ namespace Siprix
         {
             //Create models
             logsModel_ = new LogsModel();
+            subscrListModel_ = new SubscriptionsListModel(this);
             accountsListModel_ = new AccountsListModel(this);
             callsListModel_ = new CallsListModel(this);
             networkModel_ = new NetworkModel(this);
         }
 
+        public SubscriptionsListModel Subscriptions { get { return subscrListModel_; } }
         public AccountsListModel Accounts { get { return accountsListModel_; } }
         public CallsListModel Calls    { get { return callsListModel_; } } 
         public NetworkModel Networks { get { return networkModel_; } }
@@ -1030,11 +1233,12 @@ namespace Siprix
     
             int err = module_.Initialize(eventHandler_, iniData);
 
-            if(err == Siprix.Module.kNoErr){                
+            if(err == Siprix.Module.kNoErr) {
                 Logs?.Print("Siprix module initialized successfully");
                 Logs?.Print($"Version: {module_.Version()}");
 
                 loadSavedAccounts();
+                loadSavedSubscriptions();
             }
             else{
                 Logs?.Print($"Can't initialize Siprix module Err: {err} {ErrorText(err)}");
@@ -1067,12 +1271,38 @@ namespace Siprix
             }
         }
 
+        internal void loadSavedSubscriptions()
+        {
+            try
+            {
+                Logs?.Print("Loading subscriptions...");
+
+                subscrListModel_.loadFromJson(SampleWpf.Properties.Settings.Default.subscriptions);
+
+                Logs?.Print($"Loaded {subscrListModel_.Collection.Count} subscriptions");
+            }
+            catch (Exception e) {
+                Logs?.Print(e.Message);
+            }
+        }
+
+
         internal void postSaveAccountsChanges()
         {
             eventHandler_?.dispatcher_?.BeginInvoke(new Action(() => {
                 string jsonStr = accountsListModel_.storeToJson();
             
                 SampleWpf.Properties.Settings.Default.accounts = jsonStr;
+                SampleWpf.Properties.Settings.Default.Save();
+            }));
+        }
+
+        internal void postSaveSubscriptionChanges()
+        {
+            eventHandler_?.dispatcher_?.BeginInvoke(new Action(() => {
+                string jsonStr = subscrListModel_.storeToJson();
+
+                SampleWpf.Properties.Settings.Default.subscriptions = jsonStr;
                 SampleWpf.Properties.Settings.Default.Save();
             }));
         }
@@ -1109,6 +1339,13 @@ namespace Siprix
             {
                 dispatcher_?.BeginInvoke(new Action(() => {
                     parent_.accountsListModel_.OnAccountRegState(accId, state, response);
+                }));
+            }
+
+            public void OnSubscriptionState(uint subId, SubscriptionState state, string response)
+            {
+                dispatcher_?.BeginInvoke(new Action(() => {
+                    parent_.subscrListModel_.OnSubscriptionState(subId, state, response);
                 }));
             }
 

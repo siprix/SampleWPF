@@ -6,6 +6,7 @@ using System.Text;
 namespace Siprix
 {
     using AccountId = uint;
+    using SubscriptionId = uint;
     using PlayerId = uint;
     using CallId = uint;
 
@@ -29,6 +30,13 @@ namespace Siprix
         Failed,    //Registration failed
         Removed,   //Registration removed
         InProgress
+    };
+
+    public enum SubscriptionState : byte
+    {
+        Created = 0, //Subscription just created and waiting response
+        Updated,    //(received NOTIFY)
+        Destroyed   //Received error (timeout) on initial SUBSCRIBE or app unsubscribed it
     };
 
     public enum SecureMedia : byte
@@ -178,6 +186,15 @@ namespace Siprix
 
     }//DestData
 
+    public class SubscrData
+    {
+        public SubscriptionId MySubId = 0;     //Assigned by module in 'Subscription_Add'
+        public String    ToExt = "";
+        public AccountId FromAccId = 0;
+        public string    MimeSubType="";
+        public string    EventType="";
+        public uint?     ExpireTime;
+    }
 
     public interface IEventDelegate
     {
@@ -185,6 +202,7 @@ namespace Siprix
         void OnDevicesAudioChanged();
         
         void OnAccountRegState(AccountId accId, RegState state, string response);
+        void OnSubscriptionState(SubscriptionId subId, SubscriptionState state, string response);
         void OnNetworkState(string name, NetworkState state);
         void OnPlayerState(PlayerId playerId, PlayerState state);
         void OnRingerState(bool start);
@@ -214,6 +232,7 @@ namespace Siprix
         private readonly OnDevicesAudioChanged onDevicesAudioChanged_;
 
         private readonly OnAccountRegState     onAccountRegState_;
+        private readonly OnSubscriptionState   onSubscriptionState_;
         private readonly OnNetworkState        onNetworkState_;
         private readonly OnPlayerState         onPlayerState_;
         private readonly OnRingerState         onRingerState_;
@@ -234,6 +253,7 @@ namespace Siprix
             onDevicesAudioChanged_ = new OnDevicesAudioChanged   (OnDevicesAudioChangedCallback);
 
             onAccountRegState_     = new OnAccountRegState       (OnAccountRegStateCallback);
+            onSubscriptionState_   = new OnSubscriptionState     (OnSubscriptionStateCallback);
             onNetworkState_        = new OnNetworkState          (OnNetworkStateCallback);
             onPlayerState_         = new OnPlayerState           (OnPlayerStateCallback);
             onRingerState_         = new OnRingerState           (OnRingerStateCallback);
@@ -288,6 +308,7 @@ namespace Siprix
             Callback_SetDevicesAudioChanged(modulePtr_,  onDevicesAudioChanged_);
 
             Callback_SetAccountRegState(modulePtr_,      onAccountRegState_);
+            Callback_SetSubscriptionState(modulePtr_,    onSubscriptionState_);
             Callback_SetNetworkState(modulePtr_,         onNetworkState_);
             Callback_SetPlayerState(modulePtr_,          onPlayerState_);
             Callback_SetRingerState(modulePtr_,          onRingerState_);
@@ -478,6 +499,17 @@ namespace Siprix
         public ErrorCode Mixer_MakeConference()
         {
             return Mixer_MakeConference(modulePtr_);
+        }
+
+        /// [Subscriptions] ///////////////////////////////////////////////////////////////////////////////////////////////
+        public ErrorCode Subscription_Add(SubscrData subData)
+        {
+            return Subscription_Create(modulePtr_, getNative(subData), ref subData.MySubId);
+        }
+
+        public ErrorCode Subscription_Delete(SubscriptionId subId)
+        {
+            return Subscription_Destroy(modulePtr_, subId);
         }
 
 
@@ -779,11 +811,47 @@ namespace Siprix
         [DllImport(DllName)]
         private static extern ErrorCode Mixer_MakeConference(IntPtr module);
 
+        /// [Subscriptions] ///////////////////////////////////////////////////////////////////////////////////////////////
+        [DllImport(DllName)]
+        private static extern ErrorCode Subscription_Create(IntPtr module, IntPtr sub, ref SubscriptionId subId);
+        [DllImport(DllName)]
+        private static extern ErrorCode Subscription_Destroy(IntPtr module, SubscriptionId subId);
+
+
+        /// [SubscrData] ///////////////////////////////////////////////////////////////////////////////////////////////
+        [DllImport(DllName)]
+        private static extern IntPtr Subscr_GetDefault();
+        [DllImport(DllName)]
+        private static extern void Subscr_SetExtension(IntPtr sub, [MarshalAs(UnmanagedType.LPUTF8Str)] string extension);
+        [DllImport(DllName)]
+        private static extern void Subscr_SetAccountId(IntPtr sub, SubscriptionId subId);
+        [DllImport(DllName)]
+        private static extern void Subscr_SetMimeSubtype(IntPtr sub, [MarshalAs(UnmanagedType.LPUTF8Str)] string mimeType);
+        [DllImport(DllName)]
+        private static extern void Subscr_SetEventType(IntPtr sub, [MarshalAs(UnmanagedType.LPUTF8Str)] string eventType);
+        [DllImport(DllName)]
+        private static extern void Subscr_SetExpireTime(IntPtr dest, uint expireTimeSec);
+        
+        private IntPtr getNative(SubscrData subData)
+        {
+            IntPtr ptr = Subscr_GetDefault();
+            Subscr_SetExtension(ptr,   subData.ToExt);
+            Subscr_SetAccountId(ptr,   subData.FromAccId);
+            Subscr_SetMimeSubtype(ptr, subData.MimeSubType);
+            Subscr_SetEventType(ptr,   subData.EventType);
+
+            if (subData.ExpireTime != null)
+                Subscr_SetExpireTime(ptr, subData.ExpireTime.Value);
+
+            return ptr;
+        }
 
         /// [Callbacks] ///////////////////////////////////////////////////////////////////////////////////////////////
         private delegate void OnTrialModeNotified();
         private delegate void OnDevicesAudioChanged();        
         private delegate void OnAccountRegState(AccountId accId, RegState state, 
+                                            [MarshalAs(UnmanagedType.LPUTF8Str)] string response);
+        private delegate void OnSubscriptionState(SubscriptionId subId, SubscriptionState state,
                                             [MarshalAs(UnmanagedType.LPUTF8Str)] string response);
         private delegate void OnNetworkState([MarshalAs(UnmanagedType.LPUTF8Str)] string name,
                                             NetworkState state);
@@ -808,12 +876,14 @@ namespace Siprix
         private delegate void OnCallSwitched(CallId callId);
 
 
-        [DllImport(DllName)]        
+        [DllImport(DllName)]
         private static extern ErrorCode Callback_SetTrialModeNotified(IntPtr module, OnTrialModeNotified callback);
         [DllImport(DllName)]
         private static extern ErrorCode Callback_SetDevicesAudioChanged(IntPtr module, OnDevicesAudioChanged callback);
         [DllImport(DllName)]
         private static extern ErrorCode Callback_SetAccountRegState(IntPtr module, OnAccountRegState callback);
+        [DllImport(DllName)]
+        private static extern ErrorCode Callback_SetSubscriptionState(IntPtr module, OnSubscriptionState callback);
         [DllImport(DllName)]
         private static extern ErrorCode Callback_SetNetworkState(IntPtr module, OnNetworkState callback);
         [DllImport(DllName)]
@@ -856,6 +926,12 @@ namespace Siprix
             eventDelegate_?.OnAccountRegState(accId, state, response);
         }
                 
+        void OnSubscriptionStateCallback(SubscriptionId subId, SubscriptionState state,
+                                         [MarshalAs(UnmanagedType.LPUTF8Str)] string response)
+        {
+            eventDelegate_?.OnSubscriptionState(subId, state, response);
+        }
+
         void OnNetworkStateCallback([MarshalAs(UnmanagedType.LPUTF8Str)] string name,
                            NetworkState state)
         {

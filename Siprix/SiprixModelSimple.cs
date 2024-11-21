@@ -150,6 +150,13 @@ namespace Siprix
 
             public void OnDevicesAudioChanged() { }
 
+            public void OnSubscriptionState(uint subId, SubscriptionState state, string response)
+            {
+                dispatcher_?.BeginInvoke(new Action(() => {
+                    Debug.WriteLine($"OnSubscriptionState: subId:{subId} state:{state}");
+                }));
+            }
+
             public void OnAccountRegState(uint accId, RegState state, string response)
             {
                 dispatcher_?.BeginInvoke(new Action(() => {
