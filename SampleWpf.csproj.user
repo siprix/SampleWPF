@@ -13,6 +13,9 @@
     <Compile Update="AddCallWindow.xaml.cs">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Update="AddSubscriptionWindow.xaml.cs">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Update="CallControl.xaml.cs">
       <SubType>Code</SubType>
     </Compile>

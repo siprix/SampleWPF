@@ -30,6 +30,7 @@ namespace SampleWpf
             Siprix.ObjModel.Instance.Calls.PropertyChanged += onCalls_PropertyChanged;
 
             //Set data context
+            lbSubscriptions.DataContext = Siprix.ObjModel.Instance.Subscriptions;
             tbNetworkLost.DataContext = Siprix.ObjModel.Instance.Networks;
             lbAccounts.DataContext    = Siprix.ObjModel.Instance.Accounts;
             lbCalls.DataContext       = Siprix.ObjModel.Instance.Calls;
@@ -56,10 +57,16 @@ namespace SampleWpf
 
         private void AccountAdd_Click(object sender, RoutedEventArgs e)
         {
-            AddAccountWindow wnd = new AddAccountWindow();
+            AddAccountWindow wnd = new();
             wnd.ShowDialog();
         }
-        
+
+        private void SubscriptionAdd_Click(object sender, RoutedEventArgs e)
+        {
+            AddSubscriptionWindow wnd = new();
+            wnd.ShowDialog();
+        }
+
         private void AccountEdit_Click(object sender, RoutedEventArgs e)
         {
             MenuItem? mnu = sender as MenuItem;
@@ -69,7 +76,7 @@ namespace SampleWpf
             AccData? accData = Siprix.ObjModel.Instance.Accounts.GetData(accID);
             if (accData == null) return;
 
-            AddAccountWindow wnd = new AddAccountWindow(accData);
+            AddAccountWindow wnd = new(accData);
             wnd.ShowDialog();
         }
 
@@ -81,22 +88,39 @@ namespace SampleWpf
             uint accID = (uint)mnu.Tag;
 
             //Confirm deleting
-            MessageBoxButton buttons = MessageBoxButton.YesNo;
-            MessageBoxImage icon = MessageBoxImage.Question;
-            MessageBoxResult defRes = MessageBoxResult.No;
-            MessageBoxResult result = System.Windows.MessageBox.Show(this, "Confirm deleting account?", "Confirmation", buttons, icon, defRes);
+            MessageBoxResult result = System.Windows.MessageBox.Show(this, "Confirm deleting account?", "Confirmation", 
+                MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No);
             if (result != MessageBoxResult.Yes) return;
 
             //Delete
             int err = Siprix.ObjModel.Instance.Accounts.Delete(accID);
             if (err != Module.kNoErr)
             {
-                buttons = MessageBoxButton.OK;
-                icon = MessageBoxImage.Information;
-                System.Windows.MessageBox.Show(this, Siprix.ObjModel.Instance.ErrorText(err), "Information", buttons, icon);
+                System.Windows.MessageBox.Show(this, Siprix.ObjModel.Instance.ErrorText(err), "Information", 
+                    MessageBoxButton.OK, MessageBoxImage.Information);
             }
         }
 
+        private void SubscriptionDelete_Click(object sender, RoutedEventArgs e)
+        {
+            //Get selected
+            MenuItem? mnu = sender as MenuItem;
+            if ((mnu == null) || (mnu.Tag == null)) return;
+            uint subscrID = (uint)mnu.Tag;
+
+            //Confirm deleting
+            MessageBoxResult result = System.Windows.MessageBox.Show(this, "Confirm deleting subscription?", "Confirmation",
+                MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No);
+            if (result != MessageBoxResult.Yes) return;
+
+            //Delete
+            int err = Siprix.ObjModel.Instance.Subscriptions.Delete(subscrID);
+            if (err != Module.kNoErr)
+            {
+                System.Windows.MessageBox.Show(this, Siprix.ObjModel.Instance.ErrorText(err), "Information", 
+                    MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+        }
 
         private void ButtonMenu_Click(object sender, RoutedEventArgs e)
         {

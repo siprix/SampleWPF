@@ -183,6 +183,31 @@ namespace SampleWpf
     }
 
 
+    /// [BLFState ColorConverter] ////////////////////////////////////////////////////////////////
+
+    public class BLFStateColorConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter,
+                System.Globalization.CultureInfo culture)
+        {
+            BLFState? blfState = value as BLFState?;
+            if (blfState == null) return System.Windows.Data.Binding.DoNothing;
+
+            switch (blfState)
+            {
+                case BLFState.SubscriptionDestroyed: return new SolidColorBrush(Colors.Gray);
+                case BLFState.Terminated:
+                case BLFState.Unknown: return new SolidColorBrush(Colors.Green); //Ready to make call
+                default: return new SolidColorBrush(Colors.Red); //Call in progress
+            }
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter,
+                System.Globalization.CultureInfo culture)
+        {
+            return BLFState.Unknown;
+        }
+    }
 
     /// [SwitchedCall ColorConverter] ////////////////////////////////////////////////////////////////
 

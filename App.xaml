@@ -20,6 +20,8 @@
         <local:RegStateIconConverter x:Key="RegStateIconConverter"/>
         <local:RegStateColorConverter x:Key="RegStateColorConverter"/>
 
+        <local:BLFStateColorConverter x:Key="BLFStateColorConverter"/>        
+
         <local:SwitchedCallColorConverter x:Key="SwitchedCallColorConverter"/>
     </Application.Resources>
 </Application>
