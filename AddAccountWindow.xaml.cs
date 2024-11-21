@@ -18,15 +18,15 @@ namespace SampleWpf
 {
     public partial class AddAccountWindow : Window
     {
-        bool addNew_;
-        AccData data_;
+        readonly bool addNew_;
+        readonly AccData data_;
 
         public AddAccountWindow(AccData? data = null)
         {
             InitializeComponent();
 
             addNew_ = (data == null);
-            data_ = (data == null)? new Siprix.AccData() : data;
+            data_ = data ?? new Siprix.AccData();
             Owner = App.Current.MainWindow;
 
             //Set data to controls

@@ -20,11 +20,11 @@ namespace SampleWpf
     /// </summary>
     public partial class AddCallWindow : Window
     {
-        DestData data_;
+        readonly DestData data_;
         public AddCallWindow()
         {
             InitializeComponent();
-            
+            Owner = App.Current.MainWindow;
             data_ = new Siprix.DestData();
 
             //Set data to controls

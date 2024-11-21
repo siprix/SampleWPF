@@ -207,7 +207,6 @@ namespace SampleWpf
         private void AddCall_Click(object sender, RoutedEventArgs e)
         {
             AddCallWindow wnd = new();
-            wnd.Owner = App.Current.MainWindow;
             wnd.ShowDialog();
         }
     }
