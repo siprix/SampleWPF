@@ -1125,6 +1125,45 @@ namespace Siprix
 
     }//SubscriptionsListModel
 
+    /////////////////////////////////////////////////////////////////
+    /// MessagesListModel
+    public class MessagesListModel(ObjModel parent)
+    {
+        //readonly ObservableCollection<MessageModel> collection_ = new();
+        readonly ObjModel parent_ = parent;
+
+        //public ObservableCollection<MessageModel> Collection { get { return collection_; } }
+
+        public int Send(Siprix.MsgData msg, bool saveChanges = true)
+        {
+            parent_.Logs?.Print($"Sending new message ext:{msg.ToExt} accId:@{msg.FromAccId}");
+
+            //Add
+            int err = parent_.Module.Message_Send(msg);
+            if (err != Siprix.Module.kNoErr)
+            {
+                parent_.Logs?.Print($"Can't send message Err: {err} {parent_.ErrorText(err)}");
+                return err;
+            }
+
+            //collection_.Add(msg);
+
+            parent_.Logs?.Print($"Posted successfully with id: {msg.MyMsgId}");
+            //if (saveChanges) parent_.postSaveMessagesChanges();
+            return err;
+        }
+
+        public void OnMessageSentState(uint messageId, bool success, string response)
+        {
+            parent_.Logs?.Print($"OnMessageSentState msgId:{messageId} success:{success} response:{response}");
+        }
+        public void OnMessageIncoming(uint accId, string hdrFrom, string body)
+        {
+            parent_.Logs?.Print($"OnMessageIncoming accId:{accId} hdrFrom:{hdrFrom} body:'{body}'");
+        }
+
+    }//SubscriptionsListModel
+
 
     /////////////////////////////////////////////////////////////////
     /// NetworkModel
@@ -1180,6 +1219,7 @@ namespace Siprix
     {
         readonly AccountsListModel accountsListModel_;
         readonly SubscriptionsListModel subscrListModel_;
+        readonly MessagesListModel messagesListModel_;
         readonly CallsListModel callsListModel_;
         readonly NetworkModel networkModel_;
         readonly LogsModel? logsModel_;
@@ -1196,11 +1236,13 @@ namespace Siprix
             logsModel_ = new LogsModel();
             subscrListModel_ = new SubscriptionsListModel(this);
             accountsListModel_ = new AccountsListModel(this);
+            messagesListModel_ = new MessagesListModel(this);
             callsListModel_ = new CallsListModel(this);
             networkModel_ = new NetworkModel(this);
         }
 
         public SubscriptionsListModel Subscriptions { get { return subscrListModel_; } }
+        public MessagesListModel Messages { get { return messagesListModel_; } }
         public AccountsListModel Accounts { get { return accountsListModel_; } }
         public CallsListModel Calls    { get { return callsListModel_; } } 
         public NetworkModel Networks { get { return networkModel_; } }
@@ -1429,10 +1471,23 @@ namespace Siprix
                     parent_.callsListModel_.OnCallSwitched(callId);
                 }));
             }
+
+            public void OnMessageSentState(uint messageId, bool success, string response)
+            {
+                dispatcher_?.BeginInvoke(new Action(() => {
+                    parent_.messagesListModel_.OnMessageSentState(messageId, success, response);
+                }));
+            }
+
+            public void OnMessageIncoming(uint accId, string hdrFrom, string body)
+            {
+                dispatcher_?.BeginInvoke(new Action(() => {
+                    parent_.messagesListModel_.OnMessageIncoming(accId, hdrFrom, body);
+                }));
+            }
         }
 
     }//ObjModel
-
 
 
     /// A command whose sole purpose is to relay its functionality to other

@@ -7,6 +7,7 @@ namespace Siprix
 {
     using AccountId = uint;
     using SubscriptionId = uint;
+    using MessageId = uint;
     using PlayerId = uint;
     using CallId = uint;
 
@@ -181,10 +182,10 @@ namespace Siprix
         public String    ToExt = "";
         public AccountId FromAccId = 0;
         public bool      WithVideo = false;
+        public string?   DisplayName;
         public int?      InviteTimeout;
         public Dictionary<String, String>? Xheaders;
-
-    }//DestData
+    }
 
     public class SubscrData
     {
@@ -194,6 +195,14 @@ namespace Siprix
         public string    MimeSubType="";
         public string    EventType="";
         public uint?     ExpireTime;
+    }
+
+    public class MsgData
+    {
+        public MessageId MyMsgId = 0;     //Assigned by module in 'Message_Send'
+        public String ToExt = "";
+        public AccountId FromAccId = 0;
+        public string Body = "";
     }
 
     public interface IEventDelegate
@@ -216,6 +225,9 @@ namespace Siprix
         void OnCallDtmfReceived(CallId callId, ushort tone);
         void OnCallHeld(CallId callId, HoldState state);
         void OnCallSwitched(CallId callId);
+
+        void OnMessageSentState(MessageId messageId, bool success, string response);
+        void OnMessageIncoming(AccountId accId, string hdrFrom, string body);
     }
 
 
@@ -247,6 +259,9 @@ namespace Siprix
         private readonly OnCallHeld            onCallHeld_;
         private readonly OnCallSwitched        onCallSwitched_;
 
+        private readonly OnMessageSentState    onMessageSentState_;
+        private readonly OnMessageIncoming     onMessageIncoming_;
+
         public Module()
         {
             onTrialModeNotified_   = new OnTrialModeNotified     (OnTrialModeNotifiedCallback);
@@ -267,6 +282,9 @@ namespace Siprix
             onCallDtmfReceived_    = new OnCallDtmfReceived      (OnCallDtmfReceivedCallback);
             onCallHeld_            = new OnCallHeld              (OnCallHeldCallback);
             onCallSwitched_        = new OnCallSwitched          (OnCallSwitchedCallback);
+
+            onMessageSentState_   = new OnMessageSentState       (OnMessageSentStateCallback);
+            onMessageIncoming_    = new OnMessageIncoming        (OnMessageIncomingCallback);
         }
 
         ~Module()
@@ -322,6 +340,9 @@ namespace Siprix
             Callback_SetCallRedirected(modulePtr_,       onCallRedirected_);
             Callback_SetCallSwitched(modulePtr_,         onCallSwitched_);
             Callback_SetCallHeld(modulePtr_,             onCallHeld_);
+
+            Callback_SetMessageSentState(modulePtr_,     onMessageSentState_);
+            Callback_SetMessageIncoming(modulePtr_,      onMessageIncoming_);
             return err;
         }
 
@@ -358,7 +379,7 @@ namespace Siprix
         {
             IntPtr strPtr = GetErrorText(code);
             string? ver = Marshal.PtrToStringUTF8(strPtr);
-            return (ver == null) ? "" : ver;
+            return ver ?? "";
         }
 
         /// [Account] ///////////////////////////////////////////////////////////////////////////////////////////////
@@ -489,6 +510,10 @@ namespace Siprix
             return Call_Bye(modulePtr_, callId);
         }
 
+        public ErrorCode Call_Renegotiate(CallId callId)
+        {
+            return Call_Renegotiate(modulePtr_, callId);
+        }
 
         /// [Mixer] ///////////////////////////////////////////////////////////////////////////////////////////////
         public ErrorCode Mixer_SwitchToCall(CallId callId)
@@ -499,6 +524,12 @@ namespace Siprix
         public ErrorCode Mixer_MakeConference()
         {
             return Mixer_MakeConference(modulePtr_);
+        }
+
+        /// [Messages] ///////////////////////////////////////////////////////////////////////////////////////////////
+        public ErrorCode Message_Send(MsgData msgData)
+        {
+            return Message_Send(modulePtr_, getNative(msgData), ref msgData.MyMsgId);
         }
 
         /// [Subscriptions] ///////////////////////////////////////////////////////////////////////////////////////////////
@@ -736,6 +767,8 @@ namespace Siprix
         [DllImport(DllName)]
         private static extern void Dest_SetInviteTimeout(IntPtr dest, int inviteTimeoutSec);
         [DllImport(DllName)]
+        private static extern void Dest_SetDisplayName(IntPtr dest, [MarshalAs(UnmanagedType.LPUTF8Str)] string displayName);
+        [DllImport(DllName)]
         private static extern void Dest_AddXHeader(IntPtr dest, [MarshalAs(UnmanagedType.LPUTF8Str)] string header,
                                                                 [MarshalAs(UnmanagedType.LPUTF8Str)] string value);
         private IntPtr getNative(DestData destData)
@@ -747,6 +780,9 @@ namespace Siprix
             
             if (destData.InviteTimeout != null) 
                 Dest_SetInviteTimeout(ptr, destData.InviteTimeout.Value);
+
+            if (destData.DisplayName != null)
+                Dest_SetDisplayName(ptr, destData.DisplayName);
 
             if (destData.Xheaders != null)
             {
@@ -804,12 +840,40 @@ namespace Siprix
         [DllImport(DllName)]
         private static extern ErrorCode Call_Bye(IntPtr module, CallId callId);
 
+        [DllImport(DllName)]
+        private static extern ErrorCode Call_Renegotiate(IntPtr module, CallId callId);
+
 
         /// [Mixer] ///////////////////////////////////////////////////////////////////////////////////////////////
         [DllImport(DllName)]
         private static extern ErrorCode Mixer_SwitchToCall(IntPtr module, CallId callId);
         [DllImport(DllName)]
         private static extern ErrorCode Mixer_MakeConference(IntPtr module);
+
+
+        /// [Messages] ///////////////////////////////////////////////////////////////////////////////////////////////
+        [DllImport(DllName)]
+        private static extern ErrorCode Message_Send(IntPtr module, IntPtr msg, ref MessageId msgId);
+        
+
+        /// [MsgData] ///////////////////////////////////////////////////////////////////////////////////////////////
+        [DllImport(DllName)]
+        private static extern IntPtr Msg_GetDefault();
+        [DllImport(DllName)]
+        private static extern void Msg_SetExtension(IntPtr sub, [MarshalAs(UnmanagedType.LPUTF8Str)] string extension);
+        [DllImport(DllName)]
+        private static extern void Msg_SetAccountId(IntPtr sub, SubscriptionId subId);
+        [DllImport(DllName)]
+        private static extern void Msg_SetBody(IntPtr sub, [MarshalAs(UnmanagedType.LPUTF8Str)] string body);
+
+        private IntPtr getNative(MsgData msgData)
+        {
+            IntPtr ptr = Msg_GetDefault();
+            Msg_SetExtension(ptr, msgData.ToExt);
+            Msg_SetAccountId(ptr, msgData.FromAccId);
+            Msg_SetBody(ptr, msgData.Body);
+            return ptr;
+        }
 
         /// [Subscriptions] ///////////////////////////////////////////////////////////////////////////////////////////////
         [DllImport(DllName)]
@@ -875,6 +939,11 @@ namespace Siprix
         private delegate void OnCallHeld(CallId callId, HoldState state);
         private delegate void OnCallSwitched(CallId callId);
 
+        private delegate void OnMessageSentState(MessageId messageId, bool success,
+                                            [MarshalAs(UnmanagedType.LPUTF8Str)] string response);
+        private delegate void OnMessageIncoming(AccountId accId,
+                                            [MarshalAs(UnmanagedType.LPUTF8Str)] string hdrFrom,
+                                            [MarshalAs(UnmanagedType.LPUTF8Str)] string body);
 
         [DllImport(DllName)]
         private static extern ErrorCode Callback_SetTrialModeNotified(IntPtr module, OnTrialModeNotified callback);
@@ -908,6 +977,10 @@ namespace Siprix
         private static extern ErrorCode Callback_SetCallSwitched(IntPtr module, OnCallSwitched callback);
         [DllImport(DllName)]
         private static extern ErrorCode Callback_SetCallHeld(IntPtr module, OnCallHeld callback);
+        [DllImport(DllName)]
+        private static extern ErrorCode Callback_SetMessageSentState(IntPtr module, OnMessageSentState callback);
+        [DllImport(DllName)]
+        private static extern ErrorCode Callback_SetMessageIncoming(IntPtr module, OnMessageIncoming callback);
 
 
         void OnTrialModeNotifiedCallback()
@@ -999,6 +1072,16 @@ namespace Siprix
         void OnCallSwitchedCallback(CallId callId)
         {
             eventDelegate_?.OnCallSwitched(callId);
+        }
+
+        void OnMessageSentStateCallback(MessageId messageId, bool success, string response)
+        {
+            eventDelegate_?.OnMessageSentState(messageId, success, response);
+        }
+
+        void OnMessageIncomingCallback(AccountId accId, string hdrFrom, string body)
+        {
+            eventDelegate_?.OnMessageIncoming(accId, hdrFrom, body);
         }
 
     }//Module

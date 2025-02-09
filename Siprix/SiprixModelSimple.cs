@@ -199,6 +199,9 @@ namespace Siprix
             public void OnCallDtmfReceived(uint callId, ushort tone) { }
             public void OnCallHeld(uint callId, HoldState state) { }
             public void OnCallSwitched(uint callId) { }
+
+            public void OnMessageSentState(uint messageId, bool success, string response) { }
+            public void OnMessageIncoming(uint accId, string hdrFrom, string body) { }
         }
 
     }//DirectCallModel
