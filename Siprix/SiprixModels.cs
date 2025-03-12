@@ -392,8 +392,8 @@ namespace Siprix
         bool camMuted_ = false;
         bool withVideo_;
         bool isFilePlaying_ = false;
-        readonly List<uint> playerIds_ = [];
-        
+        bool isFileRecording_ = false;
+        readonly List<uint> playerIds_ = [];        
 
         public event PropertyChangedEventHandler? PropertyChanged;
         readonly ObjModel parent_;
@@ -437,6 +437,7 @@ namespace Siprix
         public bool   IsConnected       { get { return (callState_ == CallState.Connected); } }
         public bool   IsRinging         { get { return (callState_ == CallState.Ringing);   } }
         public bool   IsFilePlaying     { get { return isFilePlaying_; } }
+        public bool   IsFileRecording   { get { return isFileRecording_; } }        
         public bool   WithVideo         { get { return withVideo_;      } }
         public bool   IsMicMuted        { get { return micMuted_;       } }
         public bool   IsCamMuted        { get { return camMuted_;       } }
@@ -588,6 +589,28 @@ namespace Siprix
                 }
             }
             return retErr;
+        }
+
+        public int RecordFile(string path)
+        {
+            parent_.Logs?.Print($"Start record file for callId:{myCallId_} path:{path}");
+            int err = parent_.Module.Call_RecordFile(myCallId_, path);
+            if (err != Siprix.Module.kNoErr)
+                parent_.Logs?.Print($"Cant StartRecording Err:{err} {parent_.ErrorText(err)}");
+            else
+                isFileRecording_ = true;
+            return err;
+        }
+
+        public int StopRecordFile()
+        {
+            parent_.Logs?.Print($"Stop record file for callId:{myCallId_}");
+            int err = parent_.Module.Call_StopRecordFile(myCallId_);
+            if (err != Siprix.Module.kNoErr)
+                parent_.Logs?.Print($"Cant StopRecording Err:{err} {parent_.ErrorText(err)}");
+            else
+                isFileRecording_ = false;
+            return err;
         }
 
         public int Hold()

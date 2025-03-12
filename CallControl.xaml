@@ -179,7 +179,7 @@
 
 
         <!-- 'Main call controls' section -->
-        <Grid x:Name="gridMain" Grid.Row="2" Width="Auto" Height="Auto" 
+        <Grid x:Name="gridMain" Grid.Row="2" Width="Auto" Height="Auto" d:Visibility="Visible"
                 HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Hidden">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
@@ -246,7 +246,7 @@
 
                 <Button.ContextMenu>
                     <ContextMenu >
-                        <MenuItem Header="Make/end conference" Height="24"  IsEnabled="False">
+                        <MenuItem Header="Make/end conference" Height="24" IsEnabled="False">
                             <MenuItem.Icon>
                                 <TextBlock Text="{x:Static local:Icons.call_merge}" FontFamily="{StaticResource MaterialIconsRegular}"  FontSize="16" />
                             </MenuItem.Icon>
@@ -266,13 +266,13 @@
 
                         <Separator />
 
-                        <MenuItem Header="Play File" Height="24"  Click="PlayFile_Click">
+                        <MenuItem Header="Play File" Height="24" IsChecked="{Binding IsFilePlaying, Mode=OneWay}" Click="PlayFile_Click">
                             <MenuItem.Icon>
                                 <TextBlock Text="{x:Static local:Icons.play_arrow}" FontFamily="{StaticResource MaterialIconsRegular}"  FontSize="16" />
                             </MenuItem.Icon>
                         </MenuItem>
 
-                        <MenuItem Header="Record" Height="24"   IsEnabled="False">
+                        <MenuItem Header="Record" Height="24" IsChecked="{Binding IsFileRecording, Mode=OneWay}"  Click="RecordFile_Click">
                             <MenuItem.Icon>
                                 <TextBlock Text="{x:Static local:Icons.radio_button_checked}" FontFamily="{StaticResource MaterialIconsRegular}"  FontSize="16" />
                             </MenuItem.Icon>

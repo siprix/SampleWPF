@@ -480,14 +480,14 @@ namespace Siprix
             return Call_StopFile(modulePtr_, playerId);
         }
 
-        public ErrorCode Call_StartRecording(CallId callId, string pathToMp3File)
+        public ErrorCode Call_RecordFile(CallId callId, string pathToMp3File)
         {
-            return Call_StartRecording(modulePtr_, callId, pathToMp3File);
+            return Call_RecordFile(modulePtr_, callId, pathToMp3File);
         }
 
-        public ErrorCode Call_StopRecording(CallId callId)
+        public ErrorCode Call_StopRecordFile(CallId callId)
         {
-            return Call_StopRecording(modulePtr_, callId);
+            return Call_StopRecordFile(modulePtr_, callId);
         }
 
         public ErrorCode Call_TransferBlind(CallId callId, string toExt)
@@ -824,10 +824,10 @@ namespace Siprix
         [DllImport(DllName)]
         private static extern ErrorCode Call_StopFile(IntPtr module, PlayerId playerId);
         [DllImport(DllName)]
-        private static extern ErrorCode Call_StartRecording(IntPtr module, CallId callId,
+        private static extern ErrorCode Call_RecordFile(IntPtr module, CallId callId,
                                         [MarshalAs(UnmanagedType.LPUTF8Str)] string pathToMp3File);
         [DllImport(DllName)]
-        private static extern ErrorCode Call_StopRecording(IntPtr module, CallId callId);
+        private static extern ErrorCode Call_StopRecordFile(IntPtr module, CallId callId);
         [DllImport(DllName)]
         private static extern ErrorCode Call_TransferBlind(IntPtr module, CallId callId,
                                         [MarshalAs(UnmanagedType.LPUTF8Str)] string toExt);

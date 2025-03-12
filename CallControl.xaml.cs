@@ -183,11 +183,34 @@ namespace SampleWpf
 
         private void PlayFile_Click(object sender, RoutedEventArgs e)
         {
-            if ((callModel_ == null)|| callModel_.IsFilePlaying) return;
+            if (callModel_ == null) return;
 
-            string pathToDemoFile = AppDomain.CurrentDomain.BaseDirectory + "Resources\\music.mp3";
-            callModel_.PlayFile(pathToDemoFile, false);
+            if(callModel_.IsFilePlaying)
+            {
+                callModel_.StopPlayFile();
+            }
+            else
+            {
+                string pathToDemoFile = AppDomain.CurrentDomain.BaseDirectory + "Resources\\music.mp3";
+                callModel_.PlayFile(pathToDemoFile, false);
+            }
         }
+
+        private void RecordFile_Click(object sender, RoutedEventArgs e)
+        {
+            if ((callModel_ == null)) return;
+
+            if (callModel_.IsFileRecording)
+            {
+                callModel_.StopRecordFile();
+            }
+            else
+            {
+                string recFile = AppDomain.CurrentDomain.BaseDirectory + "\\" + DateTime.Now.ToString("yyyyMMdd_hhmmss.wav");
+                callModel_.RecordFile(recFile);
+            }   
+        }
+        
 
         private void ButtonMenu_Click(object sender, RoutedEventArgs e)
         {
