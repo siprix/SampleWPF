@@ -135,6 +135,9 @@ namespace Siprix
         public bool?     SingleCallMode;
         public ushort?   RtpStartPort;
         public string?   HomeFolder;
+        public string?   BrandName;
+        public bool?     UseDnsSrv;
+        public bool?     RecordStereo;
         public List<string>? DnsServers;
 
     }//IniData
@@ -454,6 +457,20 @@ namespace Siprix
             else return string.Empty;
         }
 
+        public string Call_GetNonce(CallId callId)
+        {
+            uint nonceValLen = 0;
+            Call_GetNonce(modulePtr_, callId, null, ref nonceValLen);
+            if (nonceValLen > 0)
+            {
+                var sb = new StringBuilder((int)(nonceValLen+1));
+                Call_GetNonce(modulePtr_, callId, sb, ref nonceValLen);
+                return sb.ToString();
+            }
+            else return string.Empty;
+        }
+
+
         public ErrorCode Call_MuteMic(CallId callId, bool mute)
         {
             return Call_MuteMic(modulePtr_, callId, mute);
@@ -589,7 +606,13 @@ namespace Siprix
         [DllImport(DllName)]
         private static extern void Ini_SetHomeFolder(IntPtr ini, [MarshalAs(UnmanagedType.LPUTF8Str)] string homeFolder);
         [DllImport(DllName)]
+        private static extern void Ini_SetBrandName(IntPtr ini, [MarshalAs(UnmanagedType.LPUTF8Str)] string brandName);
+        [DllImport(DllName)]
         private static extern void Ini_AddDnsServer(IntPtr ini, [MarshalAs(UnmanagedType.LPUTF8Str)]  string dns);
+        [DllImport(DllName)]
+        private static extern void Ini_SetUseDnsSrv(IntPtr ini, bool enabled);
+        [DllImport(DllName)]
+        private static extern void Ini_SetRecordStereo(IntPtr ini, bool enabled);
 
         private IntPtr getNative(IniData iniData)
         {
@@ -602,6 +625,9 @@ namespace Siprix
             if (iniData.SingleCallMode       != null) Ini_SetSingleCallMode(ptr,    iniData.SingleCallMode.Value);
             if (iniData.RtpStartPort         != null) Ini_SetRtpStartPort(ptr,      iniData.RtpStartPort.Value);
             if (iniData.HomeFolder           != null) Ini_SetHomeFolder(ptr,        iniData.HomeFolder);
+            if (iniData.BrandName            != null) Ini_SetBrandName(ptr,         iniData.BrandName);
+            if (iniData.UseDnsSrv            != null) Ini_SetUseDnsSrv(ptr,         iniData.UseDnsSrv.Value);
+            if (iniData.RecordStereo         != null) Ini_SetRecordStereo(ptr,      iniData.RecordStereo.Value);
 
             if (iniData.DnsServers != null)
             {
@@ -804,6 +830,10 @@ namespace Siprix
         private static extern ErrorCode Call_Hold(IntPtr module, CallId callId);
         [DllImport(DllName)]
         private static extern ErrorCode Call_GetHoldState(IntPtr module, CallId callId, ref HoldState state);
+        [DllImport(DllName)]
+        private static extern ErrorCode Call_GetNonce(IntPtr module, CallId callId, 
+				                        [MarshalAs(UnmanagedType.LPStr)] StringBuilder? nonceVal, 
+                                        ref uint nonceValLen);
         [DllImport(DllName)]
         private static extern ErrorCode Call_GetSipHeader(IntPtr module, CallId callId,
                                 [MarshalAs(UnmanagedType.LPUTF8Str)] string hdrName,
