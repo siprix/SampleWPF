@@ -206,7 +206,7 @@ namespace SampleWpf
             }
             else
             {
-                string recFile = AppDomain.CurrentDomain.BaseDirectory + "\\" + DateTime.Now.ToString("yyyyMMdd_hhmmss.wav");
+                string recFile = AppDomain.CurrentDomain.BaseDirectory + DateTime.Now.ToString("yyyyMMdd_hhmmss.mp3");
                 callModel_.RecordFile(recFile);
             }   
         }
