@@ -319,6 +319,7 @@ EXPORT ErrorCode Call_Bye(ISiprixModule* module, CallId callId);
 
 EXPORT ErrorCode Call_GetSipHeader(ISiprixModule* module, CallId callId, 
                                 const char* hdrName, char* hdrVal, uint32_t* hdrValLen);
+EXPORT ErrorCode Call_GetNonce(ISiprixModule* module, CallId callId, char* nonceVal, uint32_t* nonceValLen);
 
 ////////////////////////////////////////////////////////////////////////////
 //Mixer
@@ -440,6 +441,9 @@ EXPORT void     Ini_SetRtpStartPort(IniData* ini, uint16_t rtpStartPort);
 EXPORT void     Ini_SetHomeFolder(IniData* ini, const char* homeFolder);
 EXPORT void     Ini_SetBrandName(IniData* ini, const char* brandName);
 EXPORT void     Ini_AddDnsServer(IniData* ini, const char* dns);
+EXPORT void     Ini_SetUseDnsSrv(IniData* ini, bool enabled);
+EXPORT void     Ini_SetRecordStereo(IniData* ini, bool enabled);
+EXPORT void     Ini_SetUnregOnDestroy(IniData* ini, bool enabled);
 
 ////////////////////////////////////////////////////////////////////////////
 //Set fields of Dest's data
