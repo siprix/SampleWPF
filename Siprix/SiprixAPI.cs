@@ -174,7 +174,7 @@ namespace Siprix
         
         public List<AudioCodec>? AudioCodecs;
         public List<VideoCodec>? VideoCodecs;
-        public Dictionary<String, String>? Xheaders;
+        public Dictionary<string, string>? Xheaders;
 
     }//AccData
 
@@ -182,18 +182,18 @@ namespace Siprix
     public class DestData
     {
         public CallId    MyCallId = 0;     //Assigned by module in 'Call_Invite'
-        public String    ToExt = "";
+        public string    ToExt = "";
         public AccountId FromAccId = 0;
         public bool      WithVideo = false;
         public string?   DisplayName;
         public int?      InviteTimeout;
-        public Dictionary<String, String>? Xheaders;
+        public Dictionary<string, string>? Xheaders;
     }
 
     public class SubscrData
     {
         public SubscriptionId MySubId = 0;     //Assigned by module in 'Subscription_Add'
-        public String    ToExt = "";
+        public string    ToExt = "";
         public AccountId FromAccId = 0;
         public string    MimeSubType="";
         public string    EventType="";
@@ -203,7 +203,7 @@ namespace Siprix
     public class MsgData
     {
         public MessageId MyMsgId = 0;     //Assigned by module in 'Message_Send'
-        public String ToExt = "";
+        public string ToExt = "";
         public AccountId FromAccId = 0;
         public string Body = "";
     }

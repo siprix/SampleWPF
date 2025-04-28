@@ -1,17 +1,5 @@
-﻿using Siprix;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
-using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Shapes;
+﻿using System.Windows;
+
 
 namespace SampleWpf
 {
@@ -20,7 +8,7 @@ namespace SampleWpf
     /// </summary>
     public partial class AddCallWindow : Window
     {
-        readonly DestData data_;
+        readonly Siprix.DestData data_;
         public AddCallWindow()
         {
             InitializeComponent();
@@ -52,12 +40,12 @@ namespace SampleWpf
 
             //Get data from controls
             data_.ToExt = txDestExt.Text;
-            data_.FromAccId = ((AccountModel)cbAccounts.SelectedItem).ID;
+            data_.FromAccId = ((Siprix.AccountModel)cbAccounts.SelectedItem).ID;
             data_.WithVideo = (cbWithVideo.IsChecked==null) ? false : (bool)cbWithVideo.IsChecked;
 
             //Try to make call
             int err = Siprix.ObjModel.Instance.Calls.Invite(data_);
-            if (err != Module.kNoErr)
+            if (err != Siprix.Module.kNoErr)
             {
                 tbErrText.Text = Siprix.ObjModel.Instance.ErrorText(err);
                 return;

@@ -1,27 +1,13 @@
-﻿using Siprix;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
-using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Shapes;
-using static System.Net.Mime.MediaTypeNames;
+﻿using System.Windows;
 
 namespace SampleWpf
 {
     public partial class AddAccountWindow : Window
     {
         readonly bool addNew_;
-        readonly AccData data_;
+        readonly Siprix.AccData data_;
 
-        public AddAccountWindow(AccData? data = null)
+        public AddAccountWindow(Siprix.AccData? data = null)
         {
             InitializeComponent();
 
@@ -36,10 +22,10 @@ namespace SampleWpf
             tbExpireTime.Text      = data_.ExpireTime.ToString();
             tbDisplayName.Text     = data_.DisplayName;
 
-            cbTransport.ItemsSource = Enum.GetValues(typeof(SipTransport));
+            cbTransport.ItemsSource = Enum.GetValues(typeof(Siprix.SipTransport));
             cbTransport.SelectedItem = data_.TranspProtocol;
 
-            cbSecureMedia.ItemsSource = Enum.GetValues(typeof(SecureMedia));
+            cbSecureMedia.ItemsSource = Enum.GetValues(typeof(Siprix.SecureMedia));
             cbSecureMedia.SelectedItem = data_.SecureMediaMode;
 
             //Set controls state
@@ -71,15 +57,15 @@ namespace SampleWpf
             data_.DisplayName  = tbDisplayName.Text;
             
             if (cbTransport.SelectedItem != null)
-                data_.TranspProtocol = (SipTransport)cbTransport.SelectedItem;
+                data_.TranspProtocol = (Siprix.SipTransport)cbTransport.SelectedItem;
 
             if (cbSecureMedia.SelectedItem != null)
-                data_.SecureMediaMode = (SecureMedia)cbSecureMedia.SelectedItem;
+                data_.SecureMediaMode = (Siprix.SecureMedia)cbSecureMedia.SelectedItem;
 
             //Try to add/update account
             int err = addNew_ ? Siprix.ObjModel.Instance.Accounts.Add(data_) 
                               : Siprix.ObjModel.Instance.Accounts.Update(data_);
-            if(err != Module.kNoErr)
+            if(err != Siprix.Module.kNoErr)
             {
                 tbErrText.Text = Siprix.ObjModel.Instance.ErrorText(err);
                 return;
