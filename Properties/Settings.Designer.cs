@@ -46,5 +46,17 @@ namespace SampleWpf.Properties {
                 this["subscriptions"] = value;
             }
         }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string messages {
+            get {
+                return ((string)(this["messages"]));
+            }
+            set {
+                this["messages"] = value;
+            }
+        }
     }
 }

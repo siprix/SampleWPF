@@ -5,9 +5,9 @@
              StartupUri="MainWindow.xaml">
     <Application.Resources>
         <FontFamily x:Key="MaterialIconsRegular">/Fonts/MaterialIcons-Regular.ttf#Material Icons</FontFamily>
-        
-        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
 
+        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+        <local:InverseBooleanToVisibilityConverter x:Key="InvBoolToVis"/>
 
         <local:MicMuteIconConverter x:Key="MicMuteIconConverter"/>
         <local:CamMuteIconConverter x:Key="CamMuteIconConverter"/>
@@ -19,6 +19,7 @@
         <local:CallDirectionIconConverter x:Key="CallDirectionIconConverter"/>
         <local:RegStateIconConverter x:Key="RegStateIconConverter"/>
         <local:RegStateColorConverter x:Key="RegStateColorConverter"/>
+        <local:MessageSentColorConverter x:Key="MessageSentColorConverter"/>
 
         <local:BLFStateColorConverter x:Key="BLFStateColorConverter"/>        
 

@@ -1,10 +1,5 @@
-﻿using Siprix;
-using System;
-using System.Collections.Generic;
-using System.Globalization;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.Globalization;
+using System.Windows;
 using System.Windows.Data;
 using System.Windows.Media;
 
@@ -95,10 +90,10 @@ namespace SampleWpf
         public object Convert(object value, Type targetType, object parameter,
                 System.Globalization.CultureInfo culture)
         {
-            HoldState? holdState = value as HoldState?;
+            Siprix.HoldState? holdState = value as Siprix.HoldState?;
             if (holdState == null) return System.Windows.Data.Binding.DoNothing;            
-            return (holdState == HoldState.Local) ||
-                   (holdState == HoldState.LocalAndRemote) ? Icons.play_arrow : Icons.pause;
+            return (holdState == Siprix.HoldState.Local) ||
+                   (holdState == Siprix.HoldState.LocalAndRemote) ? Icons.play_arrow : Icons.pause;
         }
     
         public object ConvertBack(object value, Type targetType, object parameter,
@@ -115,10 +110,10 @@ namespace SampleWpf
         public object Convert(object value, Type targetType, object parameter,
                 System.Globalization.CultureInfo culture)
         {
-            HoldState? holdState = value as HoldState?;
+            Siprix.HoldState? holdState = value as Siprix.HoldState?;
             if (holdState == null) return System.Windows.Data.Binding.DoNothing;
-            return (holdState == HoldState.Local) ||
-                   (holdState == HoldState.LocalAndRemote) ? "Unhold" : "Hold";
+            return (holdState == Siprix.HoldState.Local) ||
+                   (holdState == Siprix.HoldState.LocalAndRemote) ? "Unhold" : "Hold";
         }
 
         public object ConvertBack(object value, Type targetType, object parameter,
@@ -136,14 +131,14 @@ namespace SampleWpf
         public object Convert(object value, Type targetType, object parameter,
                 System.Globalization.CultureInfo culture)
         {
-            RegState? regState = value as RegState?;
+            Siprix.RegState? regState = value as Siprix.RegState?;
             if (regState == null) return System.Windows.Data.Binding.DoNothing;
 
             switch (regState)
             {
-                case RegState.Success:    return Icons.cloud_done;
-                case RegState.Failed:     return Icons.cloud_off;
-                case RegState.InProgress: return Icons.sync;
+                case Siprix.RegState.Success:    return Icons.cloud_done;
+                case Siprix.RegState.Failed:     return Icons.cloud_off;
+                case Siprix.RegState.InProgress: return Icons.sync;
                 default:                         return Icons.done;
             }
         }
@@ -151,7 +146,7 @@ namespace SampleWpf
         public object ConvertBack(object value, Type targetType, object parameter,
                 System.Globalization.CultureInfo culture)
         {
-            return RegState.Success;
+            return Siprix.RegState.Success;
         }
     }
 
@@ -163,14 +158,14 @@ namespace SampleWpf
         public object Convert(object value, Type targetType, object parameter,
                 System.Globalization.CultureInfo culture)
         {
-            RegState? regState = value as RegState?;
+            Siprix.RegState? regState = value as Siprix.RegState?;
             if (regState == null) return System.Windows.Data.Binding.DoNothing;
 
             switch (regState)
             {
-                case RegState.Success:    return new SolidColorBrush(Colors.Green);
-                case RegState.Failed:     return new SolidColorBrush(Colors.Red);
-                case RegState.InProgress: return new SolidColorBrush(Colors.Blue);
+                case Siprix.RegState.Success:    return new SolidColorBrush(Colors.Green);
+                case Siprix.RegState.Failed:     return new SolidColorBrush(Colors.Red);
+                case Siprix.RegState.InProgress: return new SolidColorBrush(Colors.Blue);
                 default: return new SolidColorBrush(Colors.Gray);
             }
         }
@@ -178,9 +173,27 @@ namespace SampleWpf
         public object ConvertBack(object value, Type targetType, object parameter,
                 System.Globalization.CultureInfo culture)
         {
-            return RegState.Success;
+            return Siprix.RegState.Success;
         }
     }
+
+    /// [MessageSentColorConverter ColorConverter] ////////////////////////////////////////////////////////////////
+
+    public class MessageSentColorConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter,
+                System.Globalization.CultureInfo culture)
+        {
+            bool? sentSuccess = value as bool?;
+            return new SolidColorBrush((sentSuccess==true) ? Colors.BlueViolet : Colors.Gray);
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter,
+                System.Globalization.CultureInfo culture)
+        {
+            return false;
+        }
+    }    
 
 
     /// [BLFState ColorConverter] ////////////////////////////////////////////////////////////////
@@ -190,14 +203,14 @@ namespace SampleWpf
         public object Convert(object value, Type targetType, object parameter,
                 System.Globalization.CultureInfo culture)
         {
-            BLFState? blfState = value as BLFState?;
+            Siprix.BLFState? blfState = value as Siprix.BLFState?;
             if (blfState == null) return System.Windows.Data.Binding.DoNothing;
 
             switch (blfState)
             {
-                case BLFState.SubscriptionDestroyed: return new SolidColorBrush(Colors.Gray);
-                case BLFState.Terminated:
-                case BLFState.Unknown: return new SolidColorBrush(Colors.Green); //Ready to make call
+                case Siprix.BLFState.SubscriptionDestroyed: return new SolidColorBrush(Colors.Gray);
+                case Siprix.BLFState.Terminated:
+                case Siprix.BLFState.Unknown: return new SolidColorBrush(Colors.Green); //Ready to make call
                 default: return new SolidColorBrush(Colors.Red); //Call in progress
             }
         }
@@ -205,7 +218,7 @@ namespace SampleWpf
         public object ConvertBack(object value, Type targetType, object parameter,
                 System.Globalization.CultureInfo culture)
         {
-            return BLFState.Unknown;
+            return Siprix.BLFState.Unknown;
         }
     }
 
@@ -229,5 +242,20 @@ namespace SampleWpf
         }
     }
 
+    /// [InverseBooleanToVisibilityConverter] //////////////////////////////////////////////////////////////// <summary>
+
+    /// </summary>
+    public class InverseBooleanToVisibilityConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            return (bool)value ? Visibility.Collapsed : Visibility.Visible;
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            return false;
+        }
+    }
 
 }

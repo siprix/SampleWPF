@@ -28,7 +28,7 @@ namespace Siprix
     {
         public event PropertyChangedEventHandler? PropertyChanged;
         readonly ObjModel parent_;
-        Siprix.AccData accData_;        
+        Siprix.AccData accData_;
 
         public AccountModel(Siprix.AccData accData, ObjModel parent)
         {
@@ -345,12 +345,12 @@ namespace Siprix
 
         public string storeToJson()
         {
-            List<JsonDict> jsonAccList = [];
+            List<JsonDict> jsonList = [];
             foreach(var accModel in collection_)
             {
-                jsonAccList.Add(accModel.storeToJson());
+                jsonList.Add(accModel.storeToJson());
             }
-            return JsonSerializer.Serialize(jsonAccList);
+            return JsonSerializer.Serialize(jsonList);
         }
         public void loadFromJson(string jsonString)
         {
@@ -466,7 +466,7 @@ namespace Siprix
         void setWithVideo(bool video)         { withVideo_ = video; NotifyPropertyChanged(nameof(WithVideo)); }
 
 
-        private void NotifyPropertyChanged([CallerMemberName] String propertyName = "")
+        private void NotifyPropertyChanged([CallerMemberName] string propertyName = "")
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
@@ -564,7 +564,7 @@ namespace Siprix
             return err;        
         }
 
-        public int PlayFile(String pathToMp3File, bool loop)
+        public int PlayFile(string pathToMp3File, bool loop)
         {
             parent_.Logs?.Print($"Starting play file callId:{myCallId_} {pathToMp3File}");
             uint playerId = 0;
@@ -622,7 +622,7 @@ namespace Siprix
             return err;
         }
 
-        public int TransferBlind(String toExt)
+        public int TransferBlind(string toExt)
         {
             parent_.Logs?.Print($"Transfer blind callId:{myCallId_} to:{toExt}");
             if (toExt.Length==0) return -1;
@@ -723,7 +723,7 @@ namespace Siprix
 
         public ObservableCollection<CallModel> Collection { get { return collection_; } }
 
-        private void NotifyPropertyChanged([CallerMemberName] String propertyName = "")
+        private void NotifyPropertyChanged([CallerMemberName] string propertyName = "")
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
@@ -763,7 +763,7 @@ namespace Siprix
                 return err;
             }
 
-            String accUri       = parent_.Accounts.getUri(dest.FromAccId);
+            string accUri       = parent_.Accounts.getUri(dest.FromAccId);
             bool hasSecureMedia = parent_.Accounts.hasSecureMedia(dest.FromAccId);
 
             CallModel newCall = new(dest.MyCallId, accUri, dest.ToExt, false, hasSecureMedia, dest.WithVideo, parent_);
@@ -830,7 +830,7 @@ namespace Siprix
             var callModel = collection_.Where(a => a.ID == callId).FirstOrDefault();
             if (callModel != null) return;//Call already exists, skip
 
-            String accUri       = parent_.Accounts.getUri(accId);
+            string accUri       = parent_.Accounts.getUri(accId);
             bool hasSecureMedia = parent_.Accounts.hasSecureMedia(accId);
 
             CallModel newCall = new(callId, accUri, parseExt(hdrFrom), true, hasSecureMedia, withVideo, parent_);
@@ -847,8 +847,9 @@ namespace Siprix
 
         public void OnCallConnected(uint callId, string hdrFrom, string hdrTo, bool withVideo)
         {
+            //string nonce = parent_.Module.Call_GetNonce(callId);//Get nonce received from server during last auth
             parent_.Logs?.Print($"onConnected callId:{callId} from:{hdrFrom} to:{hdrTo}");
-            //_cdrs?.setConnected(callId, hdrFrom, hdrTo);
+            //_cdrs?.setConnected(callId, hdrFrom, hdrTo);             
 
             var callModel = collection_.Where(a => a.ID == callId).FirstOrDefault();
             callModel?.OnCallConnected(hdrFrom, hdrTo, withVideo);
@@ -932,7 +933,7 @@ namespace Siprix
             foreach (var c in collection_) c.OnPlayerState(playerId, state);
         }
 
-        static String parseExt(String uri)
+        public static String parseExt(String uri)
         {
             //URI format: "displName" <sip:EXT@domain:port>
             int startIndex = uri.IndexOf(':');
@@ -1002,7 +1003,7 @@ namespace Siprix
             {
                 startIndex = resp.IndexOf(">", startIndex);
                 int endIndex = resp.IndexOf("</state>", startIndex);
-                String blfStateStr = resp.Substring(startIndex + 1, endIndex- startIndex-1);
+                string blfStateStr = resp.Substring(startIndex + 1, endIndex- startIndex-1);
                 BLFState = blfStateStr switch
                 {
                     "trying" => BLFState.Trying,
@@ -1124,12 +1125,12 @@ namespace Siprix
 
         public string storeToJson()
         {
-            List<JsonDict> jsonAccList = [];
+            List<JsonDict> jsonList = [];
             foreach (var subModel in collection_)
             {
-                jsonAccList.Add(subModel.storeToJson());
+                jsonList.Add(subModel.storeToJson());
             }
-            return JsonSerializer.Serialize(jsonAccList);
+            return JsonSerializer.Serialize(jsonList);
         }
         public void loadFromJson(string jsonString)
         {
@@ -1149,17 +1150,99 @@ namespace Siprix
     }//SubscriptionsListModel
 
     /////////////////////////////////////////////////////////////////
+    /// MessageModel
+    public class MessageModel : INotifyPropertyChanged
+    {
+        public event PropertyChangedEventHandler? PropertyChanged;
+        readonly Siprix.MsgData msgData_ = new();     
+
+        public MessageModel(Siprix.MsgData data, string accUri, bool isIncoming = false, bool isWaiting=false)
+        {
+            msgData_ = data;
+            AccUri = accUri;
+            IsIncoming = isIncoming;
+            IsWaiting = isWaiting;
+        }
+
+        public uint ID { get { return msgData_.MyMsgId; } }
+        public bool IsIncoming { get; private set; }
+        public bool IsWaiting { get; private set; }
+        public bool SentSuccess { get; private set; }
+        public string ToExt { get { return msgData_.ToExt; }  }
+        public uint AccId { get { return msgData_.FromAccId; } set { msgData_.FromAccId = value; } }
+        public string AccUri { get; private set; } = string.Empty;
+        public string From { get { return IsIncoming ? msgData_.ToExt : AccUri; } }
+        public string To { get { return IsIncoming ? AccUri : msgData_.ToExt; } }
+        public string Body { get { return msgData_.Body; } }
+
+        private void NotifyPropertyChanged([CallerMemberName] string propertyName = "")
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+
+        public void OnMessageSentState(bool success, string response)
+        {
+            IsWaiting = false;
+            SentSuccess = success;
+            NotifyPropertyChanged(nameof(IsWaiting));
+            NotifyPropertyChanged(nameof(SentSuccess));
+        }
+
+        public JsonDict storeToJson()
+        {
+            JsonDict dict = new();
+            dict.Add("Body", msgData_.Body);
+            dict.Add("FromAccId", msgData_.FromAccId);
+            dict.Add("ToExt", msgData_.ToExt);
+            dict.Add("AccUri", AccUri);
+            dict.Add("IsIncoming", IsIncoming);
+            dict.Add("SentSuccess", SentSuccess);
+            return dict;
+
+        }//storeToJson
+
+        public static Siprix.MessageModel loadFromJson(JsonElement elem, uint internalMsgId)
+        {
+            MsgData msgData = new();
+            msgData.MyMsgId = internalMsgId;
+            MessageModel m = new MessageModel(msgData, "");
+            
+            foreach (JsonProperty prop in elem.EnumerateObject())
+            {
+                bool isString = (prop.Value.ValueKind == JsonValueKind.String);
+                string strVal = isString ? prop.Value.GetString()! : "";
+            
+                switch (prop.Name)
+                {
+                    case "Body": m.msgData_.Body = strVal; break;
+                    case "FromAccId": m.msgData_.FromAccId = prop.Value.GetUInt32(); break;
+                    case "ToExt": m.msgData_.ToExt = strVal; break;
+                    case "AccUri": m.AccUri = strVal; break;
+                    case "IsIncoming": m.IsIncoming = prop.Value.GetBoolean(); break;
+                    case "SentSuccess": m.SentSuccess = prop.Value.GetBoolean(); break;
+                }//switch
+            }//for
+
+            return m;
+
+        }//loadFromJson
+
+    }//MessageModel
+
+    /////////////////////////////////////////////////////////////////
     /// MessagesListModel
     public class MessagesListModel(ObjModel parent)
     {
-        //readonly ObservableCollection<MessageModel> collection_ = new();
+        readonly ObservableCollection<MessageModel> collection_ = new();
         readonly ObjModel parent_ = parent;
+        readonly int kMaxItems = 25;
+        uint internalMsgId = 0;
 
-        //public ObservableCollection<MessageModel> Collection { get { return collection_; } }
+        public ObservableCollection<MessageModel> Collection { get { return collection_; } }
 
-        public int Send(Siprix.MsgData msg, bool saveChanges = true)
+        public int Send(Siprix.MsgData msg)
         {
-            parent_.Logs?.Print($"Sending new message ext:{msg.ToExt} accId:@{msg.FromAccId}");
+            parent_.Logs?.Print($"Sending new message to ext:{msg.ToExt} accId:@{msg.FromAccId}");
 
             //Add
             int err = parent_.Module.Message_Send(msg);
@@ -1169,23 +1252,83 @@ namespace Siprix
                 return err;
             }
 
-            //collection_.Add(msg);
+            MessageModel msgModel = new MessageModel(msg, parent_.Accounts.getUri(msg.FromAccId), false);
+            collection_.Add(msgModel);
 
             parent_.Logs?.Print($"Posted successfully with id: {msg.MyMsgId}");
-            //if (saveChanges) parent_.postSaveMessagesChanges();
+
+            if (collection_.Count > kMaxItems) collection_.RemoveAt(0);
+            parent_.postSaveMessagesChanges();
             return err;
+        }
+
+        public int Delete(uint msgId)
+        {
+            var msgModel = collection_.Where(a => a.ID == msgId).FirstOrDefault();
+            if (msgModel == null) return -1;
+
+            collection_.Remove(msgModel);
+
+            parent_.postSaveMessagesChanges();
+
+            parent_.Logs?.Print($"Deleted message msgId:{msgId}");
+            return Siprix.Module.kNoErr;
         }
 
         public void OnMessageSentState(uint messageId, bool success, string response)
         {
             parent_.Logs?.Print($"OnMessageSentState msgId:{messageId} success:{success} response:{response}");
+            var msgModel = collection_.Where(a => a.ID == messageId).FirstOrDefault();
+            msgModel?.OnMessageSentState(success, response);
+
+            parent_.postSaveMessagesChanges();
         }
         public void OnMessageIncoming(uint accId, string hdrFrom, string body)
         {
             parent_.Logs?.Print($"OnMessageIncoming accId:{accId} hdrFrom:{hdrFrom} body:'{body}'");
+
+            Siprix.MsgData msg = new MsgData();
+            msg.Body = body;
+            msg.FromAccId = accId;            
+            msg.ToExt = CallsListModel.parseExt(hdrFrom);
+            msg.MyMsgId = getInternalMsgId();
+
+            MessageModel msgModel = new MessageModel(msg, parent_.Accounts.getUri(accId), true);
+            collection_.Add(msgModel);
+
+            if (collection_.Count > kMaxItems) collection_.RemoveAt(0);
+            parent_.postSaveMessagesChanges();
         }
 
-    }//SubscriptionsListModel
+        private uint getInternalMsgId() { return --internalMsgId; }
+
+        public string storeToJson()
+        {
+            List<JsonDict> jsonList = [];
+            foreach (var msgModel in collection_)
+            {
+                jsonList.Add(msgModel.storeToJson());
+            }
+            return JsonSerializer.Serialize(jsonList);
+        }
+        public void loadFromJson(string jsonString)
+        {
+            if (jsonString.Length == 0) return;
+
+            collection_.Clear();
+
+            using (JsonDocument document = JsonDocument.Parse(jsonString))
+            {
+                foreach (JsonElement element in document.RootElement.EnumerateArray())
+                {
+                    MessageModel msgModel = MessageModel.loadFromJson(element, getInternalMsgId());
+                    msgModel.AccId = parent_.Accounts.getAccId(msgModel.AccUri);//get accountId by saved URI
+                    collection_.Add(msgModel);
+                }
+            }
+        }
+
+    }//MessagesListModel
 
 
     /////////////////////////////////////////////////////////////////
@@ -1199,7 +1342,7 @@ namespace Siprix
         public bool NetworkLost { get; private set; }
 
         //Event raised by SDK
-        public void OnNetworkStateChanged(String name, NetworkState state)
+        public void OnNetworkStateChanged(string name, NetworkState state)
         {
             parent_.Logs?.Print($"onNetworkStateChanged name:{name} {state}");
             NetworkLost = (state == NetworkState.NetworkLost);
@@ -1304,6 +1447,7 @@ namespace Siprix
 
                 loadSavedAccounts();
                 loadSavedSubscriptions();
+                loadSavedMessages();
             }
             else{
                 Logs?.Print($"Can't initialize Siprix module Err: {err} {ErrorText(err)}");
@@ -1341,10 +1485,21 @@ namespace Siprix
             try
             {
                 Logs?.Print("Loading subscriptions...");
-
                 subscrListModel_.loadFromJson(SampleWpf.Properties.Settings.Default.subscriptions);
-
                 Logs?.Print($"Loaded {subscrListModel_.Collection.Count} subscriptions");
+            }
+            catch (Exception e) {
+                Logs?.Print(e.Message);
+            }
+        }
+
+        internal void loadSavedMessages()
+        {
+            try
+            {
+                Logs?.Print("Loading messages...");
+                messagesListModel_.loadFromJson(SampleWpf.Properties.Settings.Default.messages);
+                Logs?.Print($"Loaded {subscrListModel_.Collection.Count} messages");
             }
             catch (Exception e) {
                 Logs?.Print(e.Message);
@@ -1368,6 +1523,16 @@ namespace Siprix
                 string jsonStr = subscrListModel_.storeToJson();
 
                 SampleWpf.Properties.Settings.Default.subscriptions = jsonStr;
+                SampleWpf.Properties.Settings.Default.Save();
+            }));
+        }
+
+        internal void postSaveMessagesChanges()
+        {
+            eventHandler_?.dispatcher_?.BeginInvoke(new Action(() => {
+                string jsonStr = messagesListModel_.storeToJson();
+
+                SampleWpf.Properties.Settings.Default.messages = jsonStr;
                 SampleWpf.Properties.Settings.Default.Save();
             }));
         }
