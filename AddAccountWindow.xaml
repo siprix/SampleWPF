@@ -28,35 +28,44 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <TextBlock  Text="Server (PBX):" Grid.Row="0" Margin="5"/>
+        <TextBlock  Text="Server (PBX):" Grid.Row="0" Margin="5" VerticalAlignment="Center"/>
         <TextBox x:Name="tbSipServer"  d:Text="server" Grid.Row="0" Grid.Column="1" Margin="5"/>
 
-        <TextBlock  Text="Extension:" Grid.Row="1"  Margin="5"/>
+        <TextBlock  Text="Extension:" Grid.Row="1"  Margin="5" VerticalAlignment="Center"/>
         <TextBox x:Name="tbSipExtension"  d:Text="extension" Grid.Row="1" Grid.Column="1" Margin="5"/>
 
-        <TextBlock  Text="Password:" Grid.Row="2" Margin="5"/>
+        <TextBlock  Text="Password:" Grid.Row="2" Margin="5" VerticalAlignment="Center"/>
         <PasswordBox x:Name="tbSipPassword" Grid.Row="2" Grid.Column="1" Margin="5"/>
 
         <Separator Grid.Row="3" Grid.ColumnSpan="2" VerticalAlignment="Center" Margin="5,0"/>
-        
-        <TextBlock Text="Expire time (sec):" Grid.Row="4"  Margin="5"/>
+
+        <TextBlock Text="Expire time (sec):" Grid.Row="4"  Margin="5" VerticalAlignment="Center"/>
         <TextBox  x:Name="tbExpireTime"  d:Text="expire" Grid.Row="4" Grid.Column="1" Margin="5"/>
 
-        <TextBlock  Text="Display name:" Grid.Row="5"  Margin="5"/>
+        <TextBlock  Text="Display name:" Grid.Row="5"  Margin="5" VerticalAlignment="Center"/>
         <TextBox  x:Name="tbDisplayName"  d:Text="display name" Grid.Row="5" Grid.Column="1" Margin="5"/>
 
-        <TextBlock  Text="Transport:" Grid.Row="6"  Margin="5" />
+        <TextBlock  Text="Transport:" Grid.Row="6"  Margin="5" VerticalAlignment="Center"/>
         <ComboBox x:Name="cbTransport" Grid.Row="6" Grid.Column="1" Margin="5"/>
 
-        <TextBlock  Text="Secure media:" Grid.Row="7"  Margin="5" />
-        <ComboBox x:Name="cbSecureMedia" Grid.Row="7" Grid.Column="1" Margin="5"/>
+        <TextBlock  Text="Bind address:" Grid.Row="7"  Margin="5" VerticalAlignment="Center" Visibility="Collapsed"/>
+        <ComboBox x:Name="cbBindAddr" Grid.Row="7" Grid.Column="1" Margin="5" Visibility="Collapsed" />
 
-        <TextBlock x:Name="tbErrText" Text="Error text" HorizontalAlignment="Center" Visibility="Collapsed" d:Visibility="Visible"
-            Grid.Row="8" Grid.ColumnSpan="2" Grid.Column="0" Margin="5" Foreground="Red"/>
+        <TextBlock  Text="Secure media:" Grid.Row="8"  Margin="5" VerticalAlignment="Center"/>
+        <ComboBox x:Name="cbSecureMedia" Grid.Row="8" Grid.Column="1" Margin="5"/>
 
-        <StackPanel Grid.Row="9" Grid.ColumnSpan="2" Orientation="Horizontal" HorizontalAlignment="Center" >
+        <Button x:Name="btnLocalAccount" Grid.Row="9" Grid.Column="1" Visibility="Collapsed"
+                Content="Add Local Account" Margin="5" HorizontalAlignment="Right" Click="btnAddLocalAccount_Click"/>
+
+        <TextBlock x:Name="tbErrText" Text="Error text" HorizontalAlignment="Left" MaxWidth="250"
+            Visibility="Collapsed" d:Visibility="Visible" TextWrapping="WrapWithOverflow"
+            Grid.Row="10" Grid.ColumnSpan="2" Grid.Column="0" Margin="5,0,5,0" Foreground="Red"/>
+
+        <StackPanel Grid.Row="11" Grid.ColumnSpan="2" Orientation="Horizontal" HorizontalAlignment="Center" >
             <Button x:Name="btnOK" Content="OK"  Width="100" Margin="15" HorizontalAlignment="Right" Click="btnOK_Click"/>
             <Button x:Name="btnCancel" Content="Cancel" Width="100" Margin="15" HorizontalAlignment="Right" Click="btnCancel_Click"/>
         </StackPanel>

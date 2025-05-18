@@ -1,77 +1,139 @@
-﻿using System.Windows;
+﻿using System.Net.Sockets;
+using System.Net.NetworkInformation;
+using System.Windows;
 
-namespace SampleWpf
+namespace SampleWpf;
+
+public partial class AddAccountWindow : Window
 {
-    public partial class AddAccountWindow : Window
+    readonly bool addNew_;
+    readonly Siprix.AccData data_;
+    readonly Siprix.ObjModel objModel_;
+
+    public AddAccountWindow(Siprix.ObjModel objModel, Siprix.AccData? data = null)
     {
-        readonly bool addNew_;
-        readonly Siprix.AccData data_;
+        InitializeComponent();
 
-        public AddAccountWindow(Siprix.AccData? data = null)
+        objModel_ = objModel;
+        addNew_ = (data == null);
+        data_ = data ?? new Siprix.AccData();
+        Owner = App.Current.MainWindow;
+
+        //Set data to controls
+        tbSipServer.Text       = data_.SipServer;
+        tbSipExtension.Text    = data_.SipExtension;
+        tbSipPassword.Password = data_.SipPassword;
+        tbExpireTime.Text      = data_.ExpireTime.ToString();
+        tbDisplayName.Text     = data_.DisplayName;
+
+        cbTransport.ItemsSource = Enum.GetValues(typeof(Siprix.SipTransport));
+        cbTransport.SelectedItem = data_.TranspProtocol;
+
+        cbSecureMedia.ItemsSource = Enum.GetValues(typeof(Siprix.SecureMedia));
+        cbSecureMedia.SelectedItem = data_.SecureMediaMode;
+
+        AddItemsToBindAddressCombobox();
+
+        //Set controls state
+        this.Title = addNew_ ? "Add account" : "Edit account";
+        tbSipServer.IsEnabled    = addNew_;
+        tbSipExtension.IsEnabled = addNew_;
+        tbExpireTime.IsEnabled   = addNew_;
+        cbTransport.IsEnabled    = addNew_;
+
+        tbSipServer.Focus();
+    }
+
+    private void btnCancel_Click(object sender, RoutedEventArgs e)
+    {
+        this.DialogResult = false;
+    }
+
+    private void btnOK_Click(object sender, RoutedEventArgs e)
+    {
+        //Check empty
+        if ((tbSipServer.Text.Length == 0) ||
+            (tbSipExtension.Text.Length == 0))
         {
-            InitializeComponent();
-
-            addNew_ = (data == null);
-            data_ = data ?? new Siprix.AccData();
-            Owner = App.Current.MainWindow;
-
-            //Set data to controls
-            tbSipServer.Text       = data_.SipServer;
-            tbSipExtension.Text    = data_.SipExtension;
-            tbSipPassword.Password = data_.SipPassword;
-            tbExpireTime.Text      = data_.ExpireTime.ToString();
-            tbDisplayName.Text     = data_.DisplayName;
-
-            cbTransport.ItemsSource = Enum.GetValues(typeof(Siprix.SipTransport));
-            cbTransport.SelectedItem = data_.TranspProtocol;
-
-            cbSecureMedia.ItemsSource = Enum.GetValues(typeof(Siprix.SecureMedia));
-            cbSecureMedia.SelectedItem = data_.SecureMediaMode;
-
-            //Set controls state
-            this.Title = addNew_ ? "Add account" : "Edit account";
-            tbSipServer.IsEnabled    = addNew_;
-            tbSipExtension.IsEnabled = addNew_;
-            tbExpireTime.IsEnabled   = addNew_;
-            cbTransport.IsEnabled    = addNew_;
-
-            tbSipServer.Focus();
+            tbErrText.Text = "Fields `Server (PBX)` and `Extension` can't be empty";
+            tbErrText.Visibility = Visibility.Visible;
+            return;
         }
 
-        private void btnCancel_Click(object sender, RoutedEventArgs e)
+        //Get data from controls
+        data_.SipServer    = tbSipServer.Text;
+        data_.SipExtension = tbSipExtension.Text;
+        data_.SipPassword  = tbSipPassword.Password;
+        data_.ExpireTime   = (tbExpireTime.Text.Length==0) ? 0 : uint.Parse(tbExpireTime.Text);
+        data_.DisplayName  = tbDisplayName.Text;
+
+        if (cbTransport.SelectedItem != null)
+            data_.TranspProtocol = (Siprix.SipTransport)cbTransport.SelectedItem;
+
+        if (cbSecureMedia.SelectedItem != null)
+            data_.SecureMediaMode = (Siprix.SecureMedia)cbSecureMedia.SelectedItem;
+
+        string? selectedBindAddr = cbBindAddr.SelectedValue?.ToString();
+        if (!string.IsNullOrEmpty(selectedBindAddr))
+            data_.TranspBindAddr = selectedBindAddr;
+
+        //Try to add/update account
+        int err = addNew_ ? objModel_.Accounts.Add(data_) 
+                          : objModel_.Accounts.Update(data_);
+        if(err != Siprix.ErrorCode.kNoErr)
         {
-            this.DialogResult = false;
+            tbErrText.Text = objModel_.ErrorText(err);
+            tbErrText.Visibility = Visibility.Visible;
+            return;
         }
 
-        private void btnOK_Click(object sender, RoutedEventArgs e)
+        this.DialogResult = true;
+    }
+
+    public void AddItemsToBindAddressCombobox()
+    {
+        cbBindAddr.Items.Add("");
+
+        foreach (NetworkInterface item in NetworkInterface.GetAllNetworkInterfaces())
         {
-            //Check empty
-            if ((tbSipServer.Text.Length == 0) ||
-                (tbSipExtension.Text.Length == 0)) return;
-
-            //Get data from controls
-            data_.SipServer    = tbSipServer.Text;
-            data_.SipExtension = tbSipExtension.Text;
-            data_.SipPassword  = tbSipPassword.Password;
-            data_.ExpireTime   = (tbExpireTime.Text.Length==0) ? 0 : uint.Parse(tbExpireTime.Text);
-            data_.DisplayName  = tbDisplayName.Text;
-            
-            if (cbTransport.SelectedItem != null)
-                data_.TranspProtocol = (Siprix.SipTransport)cbTransport.SelectedItem;
-
-            if (cbSecureMedia.SelectedItem != null)
-                data_.SecureMediaMode = (Siprix.SecureMedia)cbSecureMedia.SelectedItem;
-
-            //Try to add/update account
-            int err = addNew_ ? Siprix.ObjModel.Instance.Accounts.Add(data_) 
-                              : Siprix.ObjModel.Instance.Accounts.Update(data_);
-            if(err != Siprix.Module.kNoErr)
+            if ((item.NetworkInterfaceType == NetworkInterfaceType.Ethernet ||
+                (item.NetworkInterfaceType == NetworkInterfaceType.Wireless80211))&& 
+                item.OperationalStatus == OperationalStatus.Up)
             {
-                tbErrText.Text = Siprix.ObjModel.Instance.ErrorText(err);
-                return;
+                foreach (UnicastIPAddressInformation ip in item.GetIPProperties().UnicastAddresses)
+                {
+                    if (ip.Address.AddressFamily == AddressFamily.InterNetwork)
+                    {
+                        cbBindAddr.Items.Add(ip.Address.ToString());
+                    }
+                }
             }
-
-            this.DialogResult = true;
         }
+    }
+
+    private void btnAddLocalAccount_Click(object sender, RoutedEventArgs e)
+    {
+        string? selectedBindAddr = cbBindAddr.SelectedValue?.ToString();
+        if (string.IsNullOrEmpty(selectedBindAddr))
+        {
+            tbErrText.Text = "Select `Bind address`";
+            tbErrText.Visibility = Visibility.Visible;
+            return;
+        }
+
+        data_.SipServer = selectedBindAddr;
+        data_.TranspPort = 5555;//listen incoming SIP requests on this port
+        data_.SipExtension = "noreg";
+        data_.SipPassword = "---";
+        data_.ExpireTime = 0;            
+
+        int err = objModel_.Accounts.Add(data_);
+        if (err != Siprix.ErrorCode.kNoErr)
+        {
+            tbErrText.Text = objModel_.ErrorText(err);
+            tbErrText.Visibility = Visibility.Visible;
+            return;
+        }
+        this.DialogResult = true;
     }
 }

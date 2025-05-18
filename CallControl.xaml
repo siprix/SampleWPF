@@ -15,11 +15,15 @@
 
         <!-- 'Video' controls -->
         <Grid  x:Name="gridVideo"  Grid.Row="0" Grid.RowSpan="4" Visibility="Collapsed"  d:Visibility="Visible">
-            <Border x:Name="receivedVideo" Background="AliceBlue"                          
-                          HorizontalAlignment="Right" VerticalAlignment="Bottom" Width="176" Height="144"/>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Bottom" Panel.ZIndex="2">
+                <Border x:Name="receivedVideo"  Background="AliceBlue" Margin="2"  Width="176" Height="144"/>
+                <Border x:Name="receivedVideo1" Background="AliceBlue" Margin="2" Width="176" Height="144" Visibility="Collapsed"/>
+                <Border x:Name="receivedVideo2" Background="AliceBlue" Margin="2" Width="176" Height="144" Visibility="Collapsed"/>
+                <Border x:Name="receivedVideo3" Background="AliceBlue" Margin="2" Width="176" Height="144" Visibility="Collapsed"/>
+            </StackPanel>            
 
             <Border x:Name="previewVideo" Background="Aqua"
-                          HorizontalAlignment="Right" VerticalAlignment="Top" Width="176" Height="144" />
+                          HorizontalAlignment="Right" VerticalAlignment="Top" Width="176" Height="144" Margin="0,0,2,0" />
 
             <Button Width="70" Height="40"  HorizontalAlignment="Left" VerticalAlignment="Bottom"
                     Command="{Binding MuteCamCommand}"
@@ -246,7 +250,7 @@
 
                 <Button.ContextMenu>
                     <ContextMenu >
-                        <MenuItem Header="Make/end conference" Height="24" IsEnabled="False">
+                        <MenuItem Header="Make conference" Height="24" IsEnabled="False" Click="Conference_Click" x:Name="ConferenceMenu">
                             <MenuItem.Icon>
                                 <TextBlock Text="{x:Static local:Icons.call_merge}" FontFamily="{StaticResource MaterialIconsRegular}"  FontSize="16" />
                             </MenuItem.Icon>

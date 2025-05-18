@@ -339,7 +339,7 @@
                     <TextBlock Text="Calls" Margin="2,0,0,0" VerticalAlignment="Center" />
                 </StackPanel>
             </TabItem.Header>
-            <Grid>
+            <Grid x:Name="CallsGrid">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="1*"  MinHeight="80" MaxHeight="180" />
                     <RowDefinition Height="3*" />
@@ -350,7 +350,7 @@
                      ItemContainerStyle="{StaticResource listRowBorder}" 
                      ItemTemplate="{StaticResource callRowTemplate}"/>
                  
-                <local:CallControl x:Name="switchedCallCtrl" Grid.Row="1"/>
+                <!-- <local:CallControl x:Name="switchedCallCtrl" Grid.Row="1"/> -->
              </Grid>
          </TabItem>
 
@@ -433,8 +433,8 @@
                     <TextBlock Text="Logs" Margin="2,0,0,0" VerticalAlignment="Center" />
                 </StackPanel>
             </TabItem.Header>
-            <TextBox x:Name="tbLogs" Text="{Binding LogText, Mode=OneWay}" Margin="1" IsReadOnly="True" BorderThickness="0" />                         
-        </TabItem>
+            <TextBox x:Name="tbLogs" Text="{Binding LogText, Mode=OneWay}" Margin="1" IsReadOnly="True" BorderThickness="0" />
+            </TabItem>
         
     </TabControl>
 
