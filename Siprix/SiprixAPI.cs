@@ -1,5 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
+﻿#pragma warning disable CA1806, CA2101, IDE1006, SYSLIB1054
 using System.Runtime.InteropServices;
 using System.Text;
 
@@ -10,11 +9,7 @@ namespace Siprix
     using MessageId = uint;
     using PlayerId = uint;
     using CallId = uint;
-
-    using ErrorCode = int;
-    using static System.Net.Mime.MediaTypeNames;
     
-    [Flags]
     public enum LogLevel : byte
     {
         Stack = 0,
@@ -163,6 +158,7 @@ namespace Siprix
         public bool?          UseSipSchemeForTls;
         public bool?          RtcpMuxEnabled;
         public uint?          KeepAliveTime;
+        public bool?          IceEnabled;
 
         public SipTransport?  TranspProtocol;
         public ushort?        TranspPort;
@@ -208,6 +204,79 @@ namespace Siprix
         public string Body = "";
     }
 
+    public class VideoData
+    {
+        public String? noCameraImgPath;/// Path to jpg file path to the jpg file with image, which library will send when video device not available.          
+        public int?  framerateFps;/// Capturer framerate (by default 15)
+        public int?  bitrateKbps;/// Encoder bitrate, allows specify video bandwith (by default 600)        
+        public int?  height;/// Capturer video frame height (by default 480)
+        public int?  width;/// Capturer video frame width (by default 600)
+    }
+
+    public static class ErrorCode
+    {
+        public const uint kInvalidId = 0;
+
+        public const int kNoErr               = 0;
+        public const int kAlreadyInitialized  = -1000;
+        public const int kNotInitialized      = -1001;
+        public const int kInitializeFailure   = -1002;
+        public const int kObjectNull          = -1003;
+        public const int kArgumentNull        = -1004;
+        public const int kNotImplemented      = -1005;
+
+        public const int kBadSipServer        = -1010;
+        public const int kBadSipExtension     = -1011;
+        public const int kBadSecureMediaMode  = -1012;
+        public const int kBadTranspProtocol   = -1013;
+        public const int kBadTranspPort       = -1014;
+
+        public const int kDuplicateAccount    = -1021;
+        public const int kAccountNotFound     = -1022;
+        public const int kAccountHasCalls     = -1023;
+        public const int kAccountDoenstMatch  = -1024;
+        public const int kSingleAccountMode   = -1025;
+        public const int kAccountHasSubscr    = -1026;
+
+        public const int kDestNumberEmpty     = -1030;
+        public const int kDestNumberSpaces    = -1031;
+        public const int kDestNumberScheme    = -1032;
+        public const int kDestBadFormat       = -1033;
+        public const int kDestSchemeMismatch  = -1034;
+        public const int kOnlyOneCallAllowed  = -1035;    
+
+        public const int kCallNotFound        = -1040;
+        public const int kCallNotIncoming     = -1041;
+        public const int kCallAlreadyAnswered = -1042;
+        public const int kCallNotConnected    = -1043;
+        public const int kBadDtmfStr          = -1044;
+        public const int kFileDoesntExists    = -1045;
+        public const int kFileExtMp3Expected  = -1046;
+        public const int kCallAlreadySwitched = -1047;
+        public const int kCallAlredyMuted     = -1048;
+        public const int kCallRecAlredyStarted= -1049;
+        public const int kCallRecNotStarted   = -1050;
+        public const int kCallCantReferBlind  = -1051;
+        public const int kCallReferInProgress = -1052;
+        public const int kCallCantReferAtt    = -1053;
+        public const int kCallReferAttSameId  = -1054;
+        public const int kConfRequires2Calls  = -1055;
+        public const int kCallIsHolding       = -1056;
+        public const int kRndrAlreadyAssigned = -1057;
+        public const int kSipHeaderNotFound   = -1058;
+     
+        public const int kBadDeviceIndex      = -1070;
+
+        public const int kEventTypeCantBeEmpty= -1080;
+        public const int kSubTypeCantBeEmpty  = -1081;
+        public const int kSubscrDoesntExist   = -1082;
+        public const int kSubscrAlreadyExist  = -1083;
+
+        public const int kMsgBodyCantBeEmpty  = -1085;
+
+        public const int kMicPermRequired     = -1111;
+    }
+
     public interface IEventDelegate
     {
         void OnTrialModeNotified();
@@ -234,13 +303,12 @@ namespace Siprix
     }
 
 
-    public class Module : IDisposable
+    public class CoreService : IDisposable
     {
         IntPtr modulePtr_;
         IEventDelegate? eventDelegate_;
         const string DllName = "siprix.dll";
         
-        public const ErrorCode kNoErr = 0;
         public const uint kInvalidId = 0;
 
         private readonly OnTrialModeNotified   onTrialModeNotified_;
@@ -265,7 +333,7 @@ namespace Siprix
         private readonly OnMessageSentState    onMessageSentState_;
         private readonly OnMessageIncoming     onMessageIncoming_;
 
-        public Module()
+        public CoreService()
         {
             onTrialModeNotified_   = new OnTrialModeNotified     (OnTrialModeNotifiedCallback);
             onDevicesAudioChanged_ = new OnDevicesAudioChanged   (OnDevicesAudioChangedCallback);
@@ -290,7 +358,7 @@ namespace Siprix
             onMessageIncoming_    = new OnMessageIncoming        (OnMessageIncomingCallback);
         }
 
-        ~Module()
+        ~CoreService()
         {
             Dispose(false);
         }
@@ -315,13 +383,13 @@ namespace Siprix
         //---------------------------------------------
         //Module
 
-        public ErrorCode Initialize(IEventDelegate eventDelegate, IniData iniData)
+        public int Initialize(IEventDelegate eventDelegate, IniData iniData)
         {
             if(modulePtr_ == IntPtr.Zero)
                 modulePtr_ = Module_Create();
 
-            ErrorCode err = Module_Initialize(modulePtr_, getNative(iniData));
-            if(err != kNoErr) return err;
+            int err = Module_Initialize(modulePtr_, getNative(iniData));
+            if(err != ErrorCode.kNoErr) return err;
             
             eventDelegate_ = eventDelegate;
 
@@ -349,28 +417,28 @@ namespace Siprix
             return err;
         }
 
-        public ErrorCode UnInitialize()
+        public int UnInitialize()
         {
             return Module_UnInitialize(modulePtr_);
         }
 
         public bool IsInitialized()
         {
-            return (modulePtr_ != IntPtr.Zero) ? Module_IsInitialized(modulePtr_) : false;
+            return (modulePtr_ != IntPtr.Zero) && Module_IsInitialized(modulePtr_);
         }
 
         public string HomeFolder()
         {
             IntPtr strPtr = (modulePtr_ != IntPtr.Zero) ? Module_HomeFolder(modulePtr_) : 0;
             string? path = Marshal.PtrToStringUTF8(strPtr);
-            return (path == null) ? "" : path;
+            return path ?? "";
         }
 
         public string Version()
         {
             IntPtr strPtr = (modulePtr_ != IntPtr.Zero) ? Module_Version(modulePtr_) : 0;
             string? ver = Marshal.PtrToStringUTF8(strPtr);
-            return (ver==null) ? "" : ver;
+            return ver ?? "";
         }
 
         public uint VersionCode()
@@ -378,7 +446,7 @@ namespace Siprix
             return (modulePtr_ != IntPtr.Zero) ? Module_VersionCode(modulePtr_) : 0;
         }
 
-        public string ErrorText(ErrorCode code)
+        public string ErrorText(int code)
         {
             IntPtr strPtr = GetErrorText(code);
             string? ver = Marshal.PtrToStringUTF8(strPtr);
@@ -386,32 +454,32 @@ namespace Siprix
         }
 
         /// [Account] ///////////////////////////////////////////////////////////////////////////////////////////////
-        public ErrorCode Account_Add(AccData accData)
+        public int Account_Add(AccData accData)
         {
             return Account_Add(modulePtr_, getNative(accData), ref accData.MyAccId);
         }
 
-        public ErrorCode Account_Update(AccData accData, AccountId accId)
+        public int Account_Update(AccData accData, AccountId accId)
         {
             return Account_Update(modulePtr_, getNative(accData), accId);
         }
 
-        public ErrorCode Account_GetRegState(AccountId accId, ref RegState state)
+        public int Account_GetRegState(AccountId accId, ref RegState state)
         {
             return Account_GetRegState(modulePtr_, accId, ref state);
         }
 
-        public ErrorCode Account_Register(AccountId accId, uint expireTime)
+        public int Account_Register(AccountId accId, uint expireTime)
         {
             return Account_Register(modulePtr_, accId, expireTime);
         }
 
-        public ErrorCode Account_Unregister(AccountId accId)
+        public int Account_Unregister(AccountId accId)
         {
             return Account_Unregister(modulePtr_, accId);
         }
 
-        public ErrorCode Account_Delete(AccountId accId)
+        public int Account_Delete(AccountId accId)
         {
             return Account_Delete(modulePtr_, accId);
         }
@@ -419,27 +487,27 @@ namespace Siprix
 
         /// [Calls] ///////////////////////////////////////////////////////////////////////////////////////////////
 
-        public ErrorCode Call_Invite(DestData dest)
+        public int Call_Invite(DestData dest)
         {
             return Call_Invite(modulePtr_, getNative(dest), ref dest.MyCallId);
         }
 
-        public ErrorCode Call_Reject(CallId callId, uint statusCode=486)
+        public int Call_Reject(CallId callId, uint statusCode=486)
         {
             return Call_Reject(modulePtr_, callId, statusCode);
         }
 
-        public ErrorCode Call_Accept(CallId callId, bool withVideo)
+        public int Call_Accept(CallId callId, bool withVideo)
         {
             return Call_Accept(modulePtr_, callId, withVideo);
         }
 
-        public ErrorCode Call_Hold(CallId callId)
+        public int Call_Hold(CallId callId)
         {
             return Call_Hold(modulePtr_, callId);
         }
 
-        public ErrorCode Call_GetHoldState(CallId callId, ref HoldState state)
+        public int Call_GetHoldState(CallId callId, ref HoldState state)
         {
             return Call_GetHoldState(modulePtr_, callId, ref state);
         }
@@ -471,93 +539,100 @@ namespace Siprix
         }
 
 
-        public ErrorCode Call_MuteMic(CallId callId, bool mute)
+        public int Call_MuteMic(CallId callId, bool mute)
         {
             return Call_MuteMic(modulePtr_, callId, mute);
         }
 
-        public ErrorCode Call_MuteCam(CallId callId, bool mute)
+        public int Call_MuteCam(CallId callId, bool mute)
         {
             return Call_MuteCam(modulePtr_, callId, mute);
         }        
 
-        public ErrorCode Call_SendDtmf(CallId callId, string dtmfs, 
+        public int Call_SendDtmf(CallId callId, string dtmfs, 
             Int16 durationMs, Int16 intertoneGapMs, DtmfMethod method)
         {
             return Call_SendDtmf(modulePtr_, callId, dtmfs, durationMs, intertoneGapMs, method);
         }
 
-        public ErrorCode Call_PlayFile(CallId callId, string pathToMp3File, bool loop, ref PlayerId playerId)
+        public int Call_PlayFile(CallId callId, string pathToMp3File, bool loop, ref PlayerId playerId)
         {
             return Call_PlayFile(modulePtr_, callId, pathToMp3File, loop, ref playerId);
         }
 
-        public ErrorCode Call_StopFile(PlayerId playerId)
+        public int Call_StopFile(PlayerId playerId)
         {
             return Call_StopFile(modulePtr_, playerId);
         }
 
-        public ErrorCode Call_RecordFile(CallId callId, string pathToMp3File)
+        public int Call_RecordFile(CallId callId, string pathToMp3File)
         {
             return Call_RecordFile(modulePtr_, callId, pathToMp3File);
         }
 
-        public ErrorCode Call_StopRecordFile(CallId callId)
+        public int Call_StopRecordFile(CallId callId)
         {
             return Call_StopRecordFile(modulePtr_, callId);
         }
 
-        public ErrorCode Call_TransferBlind(CallId callId, string toExt)
+        public int Call_TransferBlind(CallId callId, string toExt)
         {
             return Call_TransferBlind(modulePtr_, callId, toExt);
         }
 
-        public ErrorCode Call_TransferAttended(CallId fromCallId, CallId toCallId)
+        public int Call_TransferAttended(CallId fromCallId, CallId toCallId)
         {
             return Call_TransferAttended(modulePtr_, fromCallId, toCallId);
         }
 
-        public ErrorCode Call_SetVideoWindow(CallId callId, IntPtr hwnd)
+        public int Call_SetVideoWindow(CallId callId, IntPtr hwnd)
         {
             return Call_SetVideoWindow(modulePtr_, callId, hwnd);
         }
 
-        public ErrorCode Call_Bye(CallId callId)
+        public int Call_Bye(CallId callId)
         {
             return Call_Bye(modulePtr_, callId);
         }
 
-        public ErrorCode Call_Renegotiate(CallId callId)
+        public int Call_Renegotiate(CallId callId)
         {
             return Call_Renegotiate(modulePtr_, callId);
         }
 
         /// [Mixer] ///////////////////////////////////////////////////////////////////////////////////////////////
-        public ErrorCode Mixer_SwitchToCall(CallId callId)
+        public int Mixer_SwitchToCall(CallId callId)
         {
             return Mixer_SwitchToCall(modulePtr_, callId);
         }
 
-        public ErrorCode Mixer_MakeConference()
+        public int Mixer_MakeConference()
         {
             return Mixer_MakeConference(modulePtr_);
         }
 
         /// [Messages] ///////////////////////////////////////////////////////////////////////////////////////////////
-        public ErrorCode Message_Send(MsgData msgData)
+        public int Message_Send(MsgData msgData)
         {
             return Message_Send(modulePtr_, getNative(msgData), ref msgData.MyMsgId);
         }
 
         /// [Subscriptions] ///////////////////////////////////////////////////////////////////////////////////////////////
-        public ErrorCode Subscription_Add(SubscrData subData)
+        public int Subscription_Add(SubscrData subData)
         {
             return Subscription_Create(modulePtr_, getNative(subData), ref subData.MySubId);
         }
 
-        public ErrorCode Subscription_Delete(SubscriptionId subId)
+        public int Subscription_Delete(SubscriptionId subId)
         {
             return Subscription_Destroy(modulePtr_, subId);
+        }
+
+
+        /// [Devices] ///////////////////////////////////////////////////////////////////////////////////////////////
+        public int Dvc_SetVideoParams(VideoData vdoData)
+        {
+            return Dvc_SetVideoParams(modulePtr_, getNative(vdoData));
         }
 
 
@@ -565,9 +640,9 @@ namespace Siprix
         [DllImport(DllName)]
         private static extern IntPtr Module_Create();
         [DllImport(DllName)]
-        private static extern ErrorCode Module_Initialize(IntPtr modulePtr, IntPtr iniDataPtr);
+        private static extern int Module_Initialize(IntPtr modulePtr, IntPtr iniDataPtr);
         [DllImport(DllName)]
-        private static extern ErrorCode Module_UnInitialize(IntPtr modulePtr);
+        private static extern int Module_UnInitialize(IntPtr modulePtr);
         [DllImport(DllName)]
         private static extern bool Module_IsInitialized(IntPtr modulePtr);
         [DllImport(DllName)]        
@@ -577,7 +652,7 @@ namespace Siprix
         [DllImport(DllName)]
         private static extern uint Module_VersionCode(IntPtr modulePtr);
         [DllImport(DllName)]
-        private static extern IntPtr GetErrorText(ErrorCode code);
+        private static extern IntPtr GetErrorText(int code);
 
 
         /// [Ini] ///////////////////////////////////////////////////////////////////////////////////////////////
@@ -614,7 +689,7 @@ namespace Siprix
         [DllImport(DllName)]
         private static extern void Ini_SetRecordStereo(IntPtr ini, bool enabled);
 
-        private IntPtr getNative(IniData iniData)
+        private static IntPtr getNative(IniData iniData)
         {
             IntPtr ptr = Ini_GetDefault();
             if (iniData.License              != null) Ini_SetLicense(ptr,           iniData.License);
@@ -713,7 +788,7 @@ namespace Siprix
         [DllImport(DllName)]
         private static extern void Acc_ResetVideoCodecs(IntPtr acc);
         
-        private IntPtr getNative(AccData accData)
+        private static IntPtr getNative(AccData accData)
         {
             IntPtr ptr = Acc_GetDefault();
             Acc_SetSipServer(ptr,    accData.SipServer);
@@ -733,6 +808,7 @@ namespace Siprix
             if (accData.UseSipSchemeForTls!= null) Acc_SetUseSipSchemeForTls(ptr, accData.UseSipSchemeForTls.Value);
             if (accData.RtcpMuxEnabled    != null) Acc_SetRtcpMuxEnabled(ptr,     accData.RtcpMuxEnabled.Value);
             if (accData.KeepAliveTime     != null) Acc_SetKeepAliveTime(ptr,      accData.KeepAliveTime.Value);
+            if (accData.IceEnabled        != null) Acc_SetIceEnabled(ptr,         accData.IceEnabled.Value);
 
             if (accData.TranspProtocol    != null) Acc_SetTranspProtocol(ptr,     accData.TranspProtocol.Value);
             if (accData.TranspPort        != null) Acc_SetTranspPort(ptr,         accData.TranspPort.Value);
@@ -768,17 +844,17 @@ namespace Siprix
 
         /// [Accounts] ///////////////////////////////////////////////////////////////////////////////////////////////
         [DllImport(DllName)]
-        private static extern ErrorCode Account_Add(IntPtr module, IntPtr acc, ref AccountId accId);
+        private static extern int Account_Add(IntPtr module, IntPtr acc, ref AccountId accId);
         [DllImport(DllName)]
-        private static extern ErrorCode Account_Update(IntPtr module, IntPtr acc, AccountId accId);
+        private static extern int Account_Update(IntPtr module, IntPtr acc, AccountId accId);
         [DllImport(DllName)]
-        private static extern ErrorCode Account_GetRegState(IntPtr module, AccountId accId, ref RegState state);
+        private static extern int Account_GetRegState(IntPtr module, AccountId accId, ref RegState state);
         [DllImport(DllName)]
-        private static extern ErrorCode Account_Register(IntPtr module, AccountId accId, uint expireTime);
+        private static extern int Account_Register(IntPtr module, AccountId accId, uint expireTime);
         [DllImport(DllName)]
-        private static extern ErrorCode Account_Unregister(IntPtr module, AccountId accId);
+        private static extern int Account_Unregister(IntPtr module, AccountId accId);
         [DllImport(DllName)]
-        private static extern ErrorCode Account_Delete(IntPtr module, AccountId accId);
+        private static extern int Account_Delete(IntPtr module, AccountId accId);
 
 
         /// [Dest] ///////////////////////////////////////////////////////////////////////////////////////////////
@@ -797,7 +873,7 @@ namespace Siprix
         [DllImport(DllName)]
         private static extern void Dest_AddXHeader(IntPtr dest, [MarshalAs(UnmanagedType.LPUTF8Str)] string header,
                                                                 [MarshalAs(UnmanagedType.LPUTF8Str)] string value);
-        private IntPtr getNative(DestData destData)
+        private static IntPtr getNative(DestData destData)
         {
             IntPtr ptr = Dest_GetDefault();
             Dest_SetExtension(ptr, destData.ToExt);
@@ -821,69 +897,69 @@ namespace Siprix
 
         /// [Calls] ///////////////////////////////////////////////////////////////////////////////////////////////
         [DllImport(DllName)]
-        private static extern ErrorCode Call_Invite(IntPtr module, IntPtr destination, ref CallId callId);
+        private static extern int Call_Invite(IntPtr module, IntPtr destination, ref CallId callId);
         [DllImport(DllName)]
-        private static extern ErrorCode Call_Reject(IntPtr module, CallId callId, uint statusCode);
+        private static extern int Call_Reject(IntPtr module, CallId callId, uint statusCode);
         [DllImport(DllName)]
-        private static extern ErrorCode Call_Accept(IntPtr module, CallId callId, bool withVideo);
+        private static extern int Call_Accept(IntPtr module, CallId callId, bool withVideo);
         [DllImport(DllName)]
-        private static extern ErrorCode Call_Hold(IntPtr module, CallId callId);
+        private static extern int Call_Hold(IntPtr module, CallId callId);
         [DllImport(DllName)]
-        private static extern ErrorCode Call_GetHoldState(IntPtr module, CallId callId, ref HoldState state);
+        private static extern int Call_GetHoldState(IntPtr module, CallId callId, ref HoldState state);
         [DllImport(DllName)]
-        private static extern ErrorCode Call_GetNonce(IntPtr module, CallId callId, 
+        private static extern int Call_GetNonce(IntPtr module, CallId callId, 
 				                        [MarshalAs(UnmanagedType.LPStr)] StringBuilder? nonceVal, 
                                         ref uint nonceValLen);
         [DllImport(DllName)]
-        private static extern ErrorCode Call_GetSipHeader(IntPtr module, CallId callId,
+        private static extern int Call_GetSipHeader(IntPtr module, CallId callId,
                                 [MarshalAs(UnmanagedType.LPUTF8Str)] string hdrName,
                                 [MarshalAs(UnmanagedType.LPStr)] StringBuilder? hdrVal, 
                                 ref uint hdrValLen);
         [DllImport(DllName)]
-        private static extern ErrorCode Call_MuteMic(IntPtr module, CallId callId, bool mute);
+        private static extern int Call_MuteMic(IntPtr module, CallId callId, bool mute);
         [DllImport(DllName)]
-        private static extern ErrorCode Call_MuteCam(IntPtr module, CallId callId, bool mute);
+        private static extern int Call_MuteCam(IntPtr module, CallId callId, bool mute);
         [DllImport(DllName)]
-        private static extern ErrorCode Call_SendDtmf(IntPtr module, CallId callId,
+        private static extern int Call_SendDtmf(IntPtr module, CallId callId,
                                         [MarshalAs(UnmanagedType.LPUTF8Str)] string dtmfs, 
                                         Int16 durationMs, Int16 intertoneGapMs, DtmfMethod method);
         [DllImport(DllName)]
-        private static extern ErrorCode Call_PlayFile(IntPtr module, CallId callId, 
+        private static extern int Call_PlayFile(IntPtr module, CallId callId, 
                                         [MarshalAs(UnmanagedType.LPUTF8Str)] string pathToMp3File, bool loop,
                                         ref PlayerId playerId);
         [DllImport(DllName)]
-        private static extern ErrorCode Call_StopFile(IntPtr module, PlayerId playerId);
+        private static extern int Call_StopFile(IntPtr module, PlayerId playerId);
         [DllImport(DllName)]
-        private static extern ErrorCode Call_RecordFile(IntPtr module, CallId callId,
+        private static extern int Call_RecordFile(IntPtr module, CallId callId,
                                         [MarshalAs(UnmanagedType.LPUTF8Str)] string pathToMp3File);
         [DllImport(DllName)]
-        private static extern ErrorCode Call_StopRecordFile(IntPtr module, CallId callId);
+        private static extern int Call_StopRecordFile(IntPtr module, CallId callId);
         [DllImport(DllName)]
-        private static extern ErrorCode Call_TransferBlind(IntPtr module, CallId callId,
+        private static extern int Call_TransferBlind(IntPtr module, CallId callId,
                                         [MarshalAs(UnmanagedType.LPUTF8Str)] string toExt);
         [DllImport(DllName)]
-        private static extern ErrorCode Call_TransferAttended(IntPtr module, CallId fromCallId, 
+        private static extern int Call_TransferAttended(IntPtr module, CallId fromCallId, 
                                         CallId toCallId);
         [DllImport(DllName)]
-        private static extern ErrorCode Call_SetVideoWindow(IntPtr module, CallId callId, IntPtr hwnd);
+        private static extern int Call_SetVideoWindow(IntPtr module, CallId callId, IntPtr hwnd);
 
         [DllImport(DllName)]
-        private static extern ErrorCode Call_Bye(IntPtr module, CallId callId);
+        private static extern int Call_Bye(IntPtr module, CallId callId);
 
         [DllImport(DllName)]
-        private static extern ErrorCode Call_Renegotiate(IntPtr module, CallId callId);
+        private static extern int Call_Renegotiate(IntPtr module, CallId callId);
 
 
         /// [Mixer] ///////////////////////////////////////////////////////////////////////////////////////////////
         [DllImport(DllName)]
-        private static extern ErrorCode Mixer_SwitchToCall(IntPtr module, CallId callId);
+        private static extern int Mixer_SwitchToCall(IntPtr module, CallId callId);
         [DllImport(DllName)]
-        private static extern ErrorCode Mixer_MakeConference(IntPtr module);
+        private static extern int Mixer_MakeConference(IntPtr module);
 
 
         /// [Messages] ///////////////////////////////////////////////////////////////////////////////////////////////
         [DllImport(DllName)]
-        private static extern ErrorCode Message_Send(IntPtr module, IntPtr msg, ref MessageId msgId);
+        private static extern int Message_Send(IntPtr module, IntPtr msg, ref MessageId msgId);
         
 
         /// [MsgData] ///////////////////////////////////////////////////////////////////////////////////////////////
@@ -896,7 +972,7 @@ namespace Siprix
         [DllImport(DllName)]
         private static extern void Msg_SetBody(IntPtr sub, [MarshalAs(UnmanagedType.LPUTF8Str)] string body);
 
-        private IntPtr getNative(MsgData msgData)
+        private static IntPtr getNative(MsgData msgData)
         {
             IntPtr ptr = Msg_GetDefault();
             Msg_SetExtension(ptr, msgData.ToExt);
@@ -907,9 +983,9 @@ namespace Siprix
 
         /// [Subscriptions] ///////////////////////////////////////////////////////////////////////////////////////////////
         [DllImport(DllName)]
-        private static extern ErrorCode Subscription_Create(IntPtr module, IntPtr sub, ref SubscriptionId subId);
+        private static extern int Subscription_Create(IntPtr module, IntPtr sub, ref SubscriptionId subId);
         [DllImport(DllName)]
-        private static extern ErrorCode Subscription_Destroy(IntPtr module, SubscriptionId subId);
+        private static extern int Subscription_Destroy(IntPtr module, SubscriptionId subId);
 
 
         /// [SubscrData] ///////////////////////////////////////////////////////////////////////////////////////////////
@@ -926,7 +1002,7 @@ namespace Siprix
         [DllImport(DllName)]
         private static extern void Subscr_SetExpireTime(IntPtr dest, uint expireTimeSec);
         
-        private IntPtr getNative(SubscrData subData)
+        private static IntPtr getNative(SubscrData subData)
         {
             IntPtr ptr = Subscr_GetDefault();
             Subscr_SetExtension(ptr,   subData.ToExt);
@@ -939,6 +1015,36 @@ namespace Siprix
 
             return ptr;
         }
+
+        /// [VideoData] ///////////////////////////////////////////////////////////////////////////////////////////////
+        [DllImport(DllName)]
+        private static extern IntPtr Vdo_GetDefault();
+        [DllImport(DllName)]
+        private static extern void Vdo_SetNoCameraImgPath(IntPtr sub, [MarshalAs(UnmanagedType.LPUTF8Str)] string pathToJpg);
+        [DllImport(DllName)]
+        private static extern void Vdo_SetFramerate(IntPtr sub, int fps);
+        [DllImport(DllName)]
+        private static extern void Vdo_SetBitrate(IntPtr sub, int bitrateKbps);
+        [DllImport(DllName)]
+        private static extern void Vdo_SetHeight(IntPtr sub, int height);
+        [DllImport(DllName)]
+        private static extern void Vdo_SetWidth(IntPtr dest, int width);
+
+        private static IntPtr getNative(VideoData vdoData)
+        {
+            IntPtr ptr = Vdo_GetDefault();
+            if (vdoData.noCameraImgPath != null) Vdo_SetNoCameraImgPath(ptr, vdoData.noCameraImgPath);
+            if (vdoData.framerateFps != null)    Vdo_SetFramerate(ptr, vdoData.framerateFps.Value);
+            if (vdoData.bitrateKbps != null)     Vdo_SetBitrate(ptr, vdoData.bitrateKbps.Value);
+            if (vdoData.height != null)          Vdo_SetHeight(ptr, vdoData.height.Value);
+            if (vdoData.width != null)           Vdo_SetWidth(ptr, vdoData.width.Value);
+            return ptr;
+        }
+
+
+        /// [Devices] ///////////////////////////////////////////////////////////////////////////////////////////////
+        [DllImport(DllName)]
+        private static extern int Dvc_SetVideoParams(IntPtr module, IntPtr vdo);
 
         /// [Callbacks] ///////////////////////////////////////////////////////////////////////////////////////////////
         private delegate void OnTrialModeNotified();
@@ -976,41 +1082,41 @@ namespace Siprix
                                             [MarshalAs(UnmanagedType.LPUTF8Str)] string body);
 
         [DllImport(DllName)]
-        private static extern ErrorCode Callback_SetTrialModeNotified(IntPtr module, OnTrialModeNotified callback);
+        private static extern int Callback_SetTrialModeNotified(IntPtr module, OnTrialModeNotified callback);
         [DllImport(DllName)]
-        private static extern ErrorCode Callback_SetDevicesAudioChanged(IntPtr module, OnDevicesAudioChanged callback);
+        private static extern int Callback_SetDevicesAudioChanged(IntPtr module, OnDevicesAudioChanged callback);
         [DllImport(DllName)]
-        private static extern ErrorCode Callback_SetAccountRegState(IntPtr module, OnAccountRegState callback);
+        private static extern int Callback_SetAccountRegState(IntPtr module, OnAccountRegState callback);
         [DllImport(DllName)]
-        private static extern ErrorCode Callback_SetSubscriptionState(IntPtr module, OnSubscriptionState callback);
+        private static extern int Callback_SetSubscriptionState(IntPtr module, OnSubscriptionState callback);
         [DllImport(DllName)]
-        private static extern ErrorCode Callback_SetNetworkState(IntPtr module, OnNetworkState callback);
+        private static extern int Callback_SetNetworkState(IntPtr module, OnNetworkState callback);
         [DllImport(DllName)]
-        private static extern ErrorCode Callback_SetPlayerState(IntPtr module, OnPlayerState callback);
+        private static extern int Callback_SetPlayerState(IntPtr module, OnPlayerState callback);
         [DllImport(DllName)]
-        private static extern ErrorCode Callback_SetRingerState(IntPtr module, OnRingerState callback);
+        private static extern int Callback_SetRingerState(IntPtr module, OnRingerState callback);
         [DllImport(DllName)]
-        private static extern ErrorCode Callback_SetCallProceeding(IntPtr module, OnCallProceeding callback);
+        private static extern int Callback_SetCallProceeding(IntPtr module, OnCallProceeding callback);
         [DllImport(DllName)]
-        private static extern ErrorCode Callback_SetCallTerminated(IntPtr module, OnCallTerminated callback);
+        private static extern int Callback_SetCallTerminated(IntPtr module, OnCallTerminated callback);
         [DllImport(DllName)]
-        private static extern ErrorCode Callback_SetCallConnected(IntPtr module, OnCallConnected callback);
+        private static extern int Callback_SetCallConnected(IntPtr module, OnCallConnected callback);
         [DllImport(DllName)]
-        private static extern ErrorCode Callback_SetCallIncoming(IntPtr module, OnCallIncoming callback);
+        private static extern int Callback_SetCallIncoming(IntPtr module, OnCallIncoming callback);
         [DllImport(DllName)]
-        private static extern ErrorCode Callback_SetCallDtmfReceived(IntPtr module, OnCallDtmfReceived callback);
+        private static extern int Callback_SetCallDtmfReceived(IntPtr module, OnCallDtmfReceived callback);
         [DllImport(DllName)]
-        private static extern ErrorCode Callback_SetCallTransferred(IntPtr module, OnCallTransferred callback);
+        private static extern int Callback_SetCallTransferred(IntPtr module, OnCallTransferred callback);
         [DllImport(DllName)]
-        private static extern ErrorCode Callback_SetCallRedirected(IntPtr module, OnCallRedirected callback);
+        private static extern int Callback_SetCallRedirected(IntPtr module, OnCallRedirected callback);
         [DllImport(DllName)]
-        private static extern ErrorCode Callback_SetCallSwitched(IntPtr module, OnCallSwitched callback);
+        private static extern int Callback_SetCallSwitched(IntPtr module, OnCallSwitched callback);
         [DllImport(DllName)]
-        private static extern ErrorCode Callback_SetCallHeld(IntPtr module, OnCallHeld callback);
+        private static extern int Callback_SetCallHeld(IntPtr module, OnCallHeld callback);
         [DllImport(DllName)]
-        private static extern ErrorCode Callback_SetMessageSentState(IntPtr module, OnMessageSentState callback);
+        private static extern int Callback_SetMessageSentState(IntPtr module, OnMessageSentState callback);
         [DllImport(DllName)]
-        private static extern ErrorCode Callback_SetMessageIncoming(IntPtr module, OnMessageIncoming callback);
+        private static extern int Callback_SetMessageIncoming(IntPtr module, OnMessageIncoming callback);
 
 
         void OnTrialModeNotifiedCallback()

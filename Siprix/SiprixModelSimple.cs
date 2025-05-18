@@ -16,7 +16,7 @@ namespace Siprix
 
     public class SimpleModel
     {
-        readonly Siprix.Module module_ = new();
+        readonly Siprix.CoreService core_ = new();
         SiprixEventsHandler? eventHandler_;
 
         bool camMuted_ = false;
@@ -24,7 +24,7 @@ namespace Siprix
 
         public void Initialize(AppDispatcher dispatcher)
         {
-            if (module_.IsInitialized())
+            if (core_.IsInitialized())
                 return;
 
             eventHandler_ = new SiprixEventsHandler(this, dispatcher);
@@ -34,9 +34,9 @@ namespace Siprix
             iniData.LogLevelIde = Siprix.LogLevel.Debug;
             iniData.LogLevelFile = Siprix.LogLevel.Debug;
             
-            int err = module_.Initialize(eventHandler_, iniData);
+            int err = core_.Initialize(eventHandler_, iniData);
 
-            if (err == Siprix.Module.kNoErr) {
+            if (err == Siprix.ErrorCode.kNoErr) {
                 Debug.WriteLine("Siprix module initialized successfully");
             }
             else{
@@ -46,16 +46,16 @@ namespace Siprix
 
         public void UnInitialize()
         {
-            module_.UnInitialize();
+            core_.UnInitialize();
         }
 
         public uint AddAccount(AccData data)
         {
-            int err = module_.Account_Add(data);
-            if (err != Siprix.Module.kNoErr)
+            int err = core_.Account_Add(data);
+            if (err != Siprix.ErrorCode.kNoErr)
             {
                 Debug.WriteLine($"Can't add account Err: {err} {ErrorText(err)}");                
-                return Siprix.Module.kInvalidId;
+                return Siprix.CoreService.kInvalidId;
             }
             else
             {
@@ -66,8 +66,8 @@ namespace Siprix
 
         public void Accept(uint callId)
         {
-            int err = module_.Call_Accept(callId, true);
-            if (err != Siprix.Module.kNoErr)
+            int err = core_.Call_Accept(callId, true);
+            if (err != Siprix.ErrorCode.kNoErr)
             {
                 Debug.WriteLine($"Can't accept call Err: {err} {ErrorText(err)}");
             }
@@ -75,8 +75,8 @@ namespace Siprix
 
         public void Reject(uint callId)
         {
-            int err = module_.Call_Reject(callId);
-            if (err != Siprix.Module.kNoErr)
+            int err = core_.Call_Reject(callId);
+            if (err != Siprix.ErrorCode.kNoErr)
             {
                 Debug.WriteLine($"Can't reject call Err: {err} {ErrorText(err)}");
             }
@@ -84,8 +84,8 @@ namespace Siprix
 
         public void EndCall(uint callId)
         {
-            int err = module_.Call_Bye(callId);
-            if (err != Siprix.Module.kNoErr)
+            int err = core_.Call_Bye(callId);
+            if (err != Siprix.ErrorCode.kNoErr)
             {
                 Debug.WriteLine($"Can't reject call Err: {err} {ErrorText(err)}");
             }
@@ -98,11 +98,11 @@ namespace Siprix
             dest.FromAccId = accId;
             dest.WithVideo = true;
 
-            int err = module_.Call_Invite(dest);
-            if (err != Siprix.Module.kNoErr)
+            int err = core_.Call_Invite(dest);
+            if (err != Siprix.ErrorCode.kNoErr)
             {
                 Debug.WriteLine($"Can't start call Err: {err} {ErrorText(err)}");
-                return Siprix.Module.kInvalidId;
+                return Siprix.CoreService.kInvalidId;
             }
 
             return dest.MyCallId;
@@ -110,19 +110,19 @@ namespace Siprix
 
         public void SetVideoWindow(uint callId, IntPtr hwnd)
         {
-            module_.Call_SetVideoWindow(callId, hwnd);
+            core_.Call_SetVideoWindow(callId, hwnd);
         }
 
         public void MuteCam(uint callId)
         {
             camMuted_ = !camMuted_;
-            module_.Call_MuteCam(callId, camMuted_);
+            core_.Call_MuteCam(callId, camMuted_);
         }
 
         public void MuteMic(uint callId)
         {
             micMuted_ = !micMuted_;
-            module_.Call_MuteMic(callId, micMuted_);
+            core_.Call_MuteMic(callId, micMuted_);
         }
 
         public delegate void OnCallIncomingHandler(uint callId, bool withVideo, string hdrFrom, string hdrTo);
@@ -133,7 +133,7 @@ namespace Siprix
         public event OnCallConnectedHandler? OnCallConnected_;
         public event OnCallTerminatedHandler? OnCallTerminated_;
 
-        private string ErrorText(int err) { return module_.ErrorText(err); }
+        private string ErrorText(int err) { return core_.ErrorText(err); }
 
         class SiprixEventsHandler(SimpleModel parent, AppDispatcher dispatcher) : Siprix.IEventDelegate
         {

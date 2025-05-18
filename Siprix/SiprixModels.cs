@@ -1,6 +1,5 @@
-﻿#define WPF_PROJECT
-using Siprix;
-using System;
+﻿#pragma warning disable IDE1006, IDE0060, IDE0017
+#define WPF_PROJECT
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Collections.ObjectModel;
@@ -85,10 +84,10 @@ namespace Siprix
         int refreshRegistration(uint expireSec)
         {
             string cmd = (expireSec != 0) ? "Register" : "Unregister";
-            int err = (expireSec != 0) ? parent_.Module.Account_Register(ID, expireSec)
-                                       : parent_.Module.Account_Unregister(ID);
+            int err = (expireSec != 0) ? parent_.Core.Account_Register(ID, expireSec)
+                                       : parent_.Core.Account_Unregister(ID);
                                          
-            if (err != Siprix.Module.kNoErr)
+            if (err != Siprix.ErrorCode.kNoErr)
             {
                 parent_.Logs?.Print($"Can't {cmd} AccId:{ID} Err:{err} {parent_.ErrorText(err)}");
                 return err;
@@ -234,7 +233,7 @@ namespace Siprix
 
     public class AccountsListModel(ObjModel parent)
     {
-        readonly ObservableCollection<AccountModel> collection_ = new();
+        readonly ObservableCollection<AccountModel> collection_ = [];
         readonly ObjModel parent_ = parent;
         AccountModel? selAccount_;
 
@@ -248,7 +247,7 @@ namespace Siprix
         public uint getAccId(string uri)
         {
             var accModel = collection_.Where(a => a.Uri == uri).FirstOrDefault();
-            return (accModel == null) ? Siprix.Module.kInvalidId : accModel.ID;
+            return (accModel == null) ? Siprix.CoreService.kInvalidId : accModel.ID;
         }
         public string getUri(uint accId)
         {
@@ -259,7 +258,7 @@ namespace Siprix
         public bool hasSecureMedia(uint accId)
         {
             var accModel = collection_.Where(a => a.ID == accId).FirstOrDefault();
-            return (accModel == null) ? false : accModel.HasSecureMedia;
+            return accModel != null && accModel.HasSecureMedia;
         }
 
         public AccData? GetData(uint accId)
@@ -270,10 +269,10 @@ namespace Siprix
 
         public int Add(Siprix.AccData accData, bool saveChanges=true)
         {   
-            parent_.Logs?.Print($"Adding new account: {accData.SipServer}@{accData.SipExtension}");
+            parent_.Logs?.Print($"Adding new account: {accData.SipExtension}@{accData.SipServer}");
 
-            int err = parent_.Module.Account_Add(accData);
-            if (err != Siprix.Module.kNoErr)
+            int err = parent_.Core.Account_Add(accData);
+            if (err != Siprix.ErrorCode.kNoErr)
             {
                 parent_.Logs?.Print($"Can't add account Err: {err} {parent_.ErrorText(err)}");
                 return err;
@@ -294,8 +293,8 @@ namespace Siprix
             var accModel = collection_.Where(a => a.ID == accId).FirstOrDefault();
             if (accModel == null) return -1;
 
-            int err = parent_.Module.Account_Delete(accId);
-            if (err != Siprix.Module.kNoErr)
+            int err = parent_.Core.Account_Delete(accId);
+            if (err != Siprix.ErrorCode.kNoErr)
             {
                 parent_.Logs?.Print($"Can't delete account Err: {err} {parent_.ErrorText(err)}");
                 return err;
@@ -321,8 +320,8 @@ namespace Siprix
                 return -1;
             }
 
-            int err = parent_.Module.Account_Update(accData, accData.MyAccId);
-            if (err != Siprix.Module.kNoErr)
+            int err = parent_.Core.Account_Update(accData, accData.MyAccId);
+            if (err != Siprix.ErrorCode.kNoErr)
             {
                 parent_.Logs?.Print($"Can't update account: {err} {{parent_.ErrorText(err)}}");
                 return err;
@@ -387,7 +386,7 @@ namespace Siprix
         string displName_ = "";      //Contact name
         string receivedDtmf_ = "";
         string duration_ = "";
-        string response_ = "";
+        //string response_ = "";
         bool micMuted_ = false;
         bool camMuted_ = false;
         bool withVideo_;
@@ -513,8 +512,8 @@ namespace Siprix
         public int Bye()
         {
             parent_.Logs?.Print($"Ending callId:{myCallId_}");
-            int err = parent_.Module.Call_Bye(myCallId_);
-            if (err == Siprix.Module.kNoErr) setCallState(CallState.Disconnecting);
+            int err = parent_.Core.Call_Bye(myCallId_);
+            if (err == Siprix.ErrorCode.kNoErr) setCallState(CallState.Disconnecting);
             else  parent_.Logs?.Print($"Cant Bye callId:{myCallId_} Err:{err} {parent_.ErrorText(err)}");
             return err;
         }
@@ -522,8 +521,8 @@ namespace Siprix
         public int Accept(bool withVideo)
         {
             parent_.Logs?.Print($"Accepting callId:{myCallId_}");
-            int err = parent_.Module.Call_Accept(myCallId_, withVideo);
-            if (err == Siprix.Module.kNoErr) setCallState(CallState.Accepting);
+            int err = parent_.Core.Call_Accept(myCallId_, withVideo);
+            if (err == Siprix.ErrorCode.kNoErr) setCallState(CallState.Accepting);
             else parent_.Logs?.Print($"Cant Accept callId:{myCallId_} Err:{err} {parent_.ErrorText(err)}");
             return err;
         }
@@ -531,8 +530,8 @@ namespace Siprix
         public int Reject()
         {
             parent_.Logs?.Print($"Rejecting callId:{myCallId_}");
-            int err = parent_.Module.Call_Reject(myCallId_);//Send '486 Busy now'
-            if (err == Siprix.Module.kNoErr) setCallState(CallState.Rejecting);
+            int err = parent_.Core.Call_Reject(myCallId_);//Send '486 Busy now'
+            if (err == Siprix.ErrorCode.kNoErr) setCallState(CallState.Rejecting);
             else parent_.Logs?.Print($"Cant Reject callId:{myCallId_} Err:{err} {parent_.ErrorText(err)}");
             return err;
         }
@@ -540,8 +539,8 @@ namespace Siprix
         public int MuteMic(bool mute)
         {
             parent_.Logs?.Print($"Set mic mute={mute} of call {myCallId_}");
-            int err = parent_.Module.Call_MuteMic(myCallId_, mute);
-            if (err == Siprix.Module.kNoErr) setMicMuted(mute);
+            int err = parent_.Core.Call_MuteMic(myCallId_, mute);
+            if (err == Siprix.ErrorCode.kNoErr) setMicMuted(mute);
             else parent_.Logs?.Print($"Cant MuteMic callId:{myCallId_} Err:{err} {parent_.ErrorText(err)}");
             return err;
         }
@@ -549,8 +548,8 @@ namespace Siprix
         public int MuteCam(bool mute)
         {
             parent_.Logs?.Print($"Set camera mute={mute} of call {myCallId_}");
-            int err = parent_.Module.Call_MuteCam(myCallId_, mute);
-            if (err == Siprix.Module.kNoErr) setCamMuted(mute);
+            int err = parent_.Core.Call_MuteCam(myCallId_, mute);
+            if (err == Siprix.ErrorCode.kNoErr) setCamMuted(mute);
             else parent_.Logs?.Print($"Cant MuteCam callId:{myCallId_} Err:{err} {parent_.ErrorText(err)}");
             return err;
         }
@@ -558,8 +557,8 @@ namespace Siprix
         public int SendDtmf(string tone)
         {
             parent_.Logs?.Print($"Sending dtmf callId:{myCallId_} tone:{tone}");
-            int err = parent_.Module.Call_SendDtmf(myCallId_, tone, 200, 50, DtmfMethod.DTMF_RTP);
-            if (err != Siprix.Module.kNoErr) 
+            int err = parent_.Core.Call_SendDtmf(myCallId_, tone, 200, 50, DtmfMethod.DTMF_RTP);
+            if (err != Siprix.ErrorCode.kNoErr) 
                parent_.Logs?.Print($"Cant SendDtmf callId:{myCallId_} Err:{err} {parent_.ErrorText(err)}");
             return err;        
         }
@@ -568,8 +567,8 @@ namespace Siprix
         {
             parent_.Logs?.Print($"Starting play file callId:{myCallId_} {pathToMp3File}");
             uint playerId = 0;
-            int err = parent_.Module.Call_PlayFile(myCallId_, pathToMp3File, loop, ref playerId);
-            if (err != Siprix.Module.kNoErr)
+            int err = parent_.Core.Call_PlayFile(myCallId_, pathToMp3File, loop, ref playerId);
+            if (err != Siprix.ErrorCode.kNoErr)
                 parent_.Logs?.Print($"Cant PlayFile callId:{myCallId_} Err:{err} {parent_.ErrorText(err)}");
             else
                 playerIds_.Add(playerId);
@@ -578,12 +577,12 @@ namespace Siprix
 
         public int StopPlayFile()
         {
-            int retErr = Siprix.Module.kNoErr;
+            int retErr = Siprix.ErrorCode.kNoErr;
             foreach(var playerId in playerIds_)
             {
                 parent_.Logs?.Print($"Stop play file in callId:{myCallId_} playerId:{playerId}");
-                int err = parent_.Module.Call_StopFile(playerId);
-                if (err != Siprix.Module.kNoErr) {
+                int err = parent_.Core.Call_StopFile(playerId);
+                if (err != Siprix.ErrorCode.kNoErr) {
                     parent_.Logs?.Print($"Cant StopPlayFile Err:{err} {parent_.ErrorText(err)}");
                     retErr = err;
                 }
@@ -594,8 +593,8 @@ namespace Siprix
         public int RecordFile(string path)
         {
             parent_.Logs?.Print($"Start record file for callId:{myCallId_} path:{path}");
-            int err = parent_.Module.Call_RecordFile(myCallId_, path);
-            if (err != Siprix.Module.kNoErr)
+            int err = parent_.Core.Call_RecordFile(myCallId_, path);
+            if (err != Siprix.ErrorCode.kNoErr)
                 parent_.Logs?.Print($"Cant StartRecording Err:{err} {parent_.ErrorText(err)}");
             else
                 isFileRecording_ = true;
@@ -605,8 +604,8 @@ namespace Siprix
         public int StopRecordFile()
         {
             parent_.Logs?.Print($"Stop record file for callId:{myCallId_}");
-            int err = parent_.Module.Call_StopRecordFile(myCallId_);
-            if (err != Siprix.Module.kNoErr)
+            int err = parent_.Core.Call_StopRecordFile(myCallId_);
+            if (err != Siprix.ErrorCode.kNoErr)
                 parent_.Logs?.Print($"Cant StopRecording Err:{err} {parent_.ErrorText(err)}");
             else
                 isFileRecording_ = false;
@@ -616,8 +615,8 @@ namespace Siprix
         public int Hold()
         {
             parent_.Logs?.Print($"Hold callId:{myCallId_}");
-            int err = parent_.Module.Call_Hold(myCallId_);
-            if (err == Siprix.Module.kNoErr) setCallState(CallState.Holding);
+            int err = parent_.Core.Call_Hold(myCallId_);
+            if (err == Siprix.ErrorCode.kNoErr) setCallState(CallState.Holding);
             else parent_.Logs?.Print($"Cant MuteMic callId:{myCallId_} Err:{err} {parent_.ErrorText(err)}");
             return err;
         }
@@ -627,8 +626,8 @@ namespace Siprix
             parent_.Logs?.Print($"Transfer blind callId:{myCallId_} to:{toExt}");
             if (toExt.Length==0) return -1;
 
-            int err = parent_.Module.Call_TransferBlind(myCallId_, toExt);
-            if (err == Siprix.Module.kNoErr) setCallState(CallState.Transferring);
+            int err = parent_.Core.Call_TransferBlind(myCallId_, toExt);
+            if (err == Siprix.ErrorCode.kNoErr) setCallState(CallState.Transferring);
             else parent_.Logs?.Print($"Cant TransferBlind callId:{myCallId_} Err:{err} {parent_.ErrorText(err)}");
             return err;
         }
@@ -636,26 +635,26 @@ namespace Siprix
         public int TransferAttended(uint toCallId)
         {
             parent_.Logs?.Print($"Transfer attended callId:{myCallId_} to callId:{toCallId}");
-            int err = parent_.Module.Call_TransferAttended(myCallId_, toCallId);
-            if (err == Siprix.Module.kNoErr) setCallState(CallState.Transferring);
+            int err = parent_.Core.Call_TransferAttended(myCallId_, toCallId);
+            if (err == Siprix.ErrorCode.kNoErr) setCallState(CallState.Transferring);
             else parent_.Logs?.Print($"Cant TransferAttended callId:{myCallId_} Err:{err} {parent_.ErrorText(err)}");
             return err;            
         }
         public int SetVideoWindow(IntPtr hwnd)
         {
             parent_.Logs?.Print($"SetVideoWindow callId:{myCallId_} hwnd:{hwnd}");
-            return parent_.Module.Call_SetVideoWindow(myCallId_, hwnd);
+            return parent_.Core.Call_SetVideoWindow(myCallId_, hwnd);
         }
 
         public string GetSipHeader(string hdrName)
         {
-            return parent_.Module.Call_GetSipHeader(myCallId_, hdrName);
+            return parent_.Core.Call_GetSipHeader(myCallId_, hdrName);
         }
 
         //Events raised by SDK
         public void OnCallProceeding(string response)
         {
-            response_ = response;
+            //response_ = response;
             setCallState(CallState.Proceeding);
         }
 
@@ -714,11 +713,11 @@ namespace Siprix
     public class CallsListModel(ObjModel parent) : INotifyPropertyChanged
     {
         public event PropertyChangedEventHandler? PropertyChanged;
-        readonly ObservableCollection<CallModel> collection_ = new();
+        readonly ObservableCollection<CallModel> collection_ = [];
         readonly ObjModel parent_ = parent;
 
         CallModel? switchedCall_;
-        uint lastIncomingCallId_ = Siprix.Module.kInvalidId;
+        uint lastIncomingCallId_ = Siprix.CoreService.kInvalidId;
         bool confModeStarted_ = false;
 
         public ObservableCollection<CallModel> Collection { get { return collection_; } }
@@ -730,7 +729,7 @@ namespace Siprix
 
         public bool IsSwitchedCall(uint callId)
         {
-            return (switchedCall_ == null) ? false : (switchedCall_.ID == callId);
+            return switchedCall_ != null && (switchedCall_.ID == callId);
         }
 
         public uint LastIncomingCallId() { return lastIncomingCallId_; }
@@ -756,8 +755,8 @@ namespace Siprix
         {
             parent_.Logs?.Print($"Trying to invite {dest.ToExt} from account:{dest.FromAccId}");
 
-            int err = parent_.Module.Call_Invite(dest);
-            if (err != Siprix.Module.kNoErr)
+            int err = parent_.Core.Call_Invite(dest);
+            if (err != Siprix.ErrorCode.kNoErr)
             {
                 parent_.Logs?.Print($"Can't invite Err: {err} {parent_.ErrorText(err)}");
                 return err;
@@ -778,8 +777,8 @@ namespace Siprix
         {
             parent_.Logs?.Print($"Switching mixer to callId:{callId}");
 
-            int err = parent_.Module.Mixer_SwitchToCall(callId);
-            if (err == Siprix.Module.kNoErr) ConfModeStarted = false;
+            int err = parent_.Core.Mixer_SwitchToCall(callId);
+            if (err == Siprix.ErrorCode.kNoErr) ConfModeStarted = false;
             else parent_.Logs?.Print($"Cant switch to callId:{callId} Err:{err} {parent_.ErrorText(err)}");
             //Value '_switchedCallId' will set in the callback 'onSwitched'
             return err;
@@ -791,14 +790,14 @@ namespace Siprix
             if(confModeStarted_) {
                 uint callId = (switchedCall_!=null) ? switchedCall_.ID : 0;
                 parent_.Logs?.Print($"Ending conference, switch mixer to callId: {callId}");
-                int err = parent_.Module.Mixer_SwitchToCall(callId);
+                int err = parent_.Core.Mixer_SwitchToCall(callId);
                 ConfModeStarted = false;
                 return err;
             }
             else {
                 parent_.Logs?.Print("Joining all calls to conference");
-                int err = parent_.Module.Mixer_MakeConference();
-                if (err == Siprix.Module.kNoErr) ConfModeStarted = true;
+                int err = parent_.Core.Mixer_MakeConference();
+                if (err == Siprix.ErrorCode.kNoErr) ConfModeStarted = true;
                 else parent_.Logs?.Print($"Cant make conference Err:{err} {parent_.ErrorText(err)}");
                 return err;
             }
@@ -807,7 +806,7 @@ namespace Siprix
         public int SetPreviowVideoWindow(IntPtr hwnd)
         {
             parent_.Logs?.Print($"SetPreviowVideoWindow hwnd:{hwnd}");
-            return parent_.Module.Call_SetVideoWindow(Siprix.Module.kInvalidId, hwnd);
+            return parent_.Core.Call_SetVideoWindow(Siprix.CoreService.kInvalidId, hwnd);
         }
 
         bool hasConnectedFewCalls()
@@ -847,7 +846,7 @@ namespace Siprix
 
         public void OnCallConnected(uint callId, string hdrFrom, string hdrTo, bool withVideo)
         {
-            //string nonce = parent_.Module.Call_GetNonce(callId);//Get nonce received from server during last auth
+            //string nonce = parent_.Core.Call_GetNonce(callId);//Get nonce received from server during last auth
             parent_.Logs?.Print($"onConnected callId:{callId} from:{hdrFrom} to:{hdrTo}");
             //_cdrs?.setConnected(callId, hdrFrom, hdrTo);             
 
@@ -894,9 +893,9 @@ namespace Siprix
            if (origCall == null) return;
 
            //Clone 'origCallId' and add to collection of calls as related one           
-           CallModel relatedCall = new CallModel(relatedCallId, origCall.AccUri, parseExt(referTo), false, 
-                                                origCall.HasSecureMedia, origCall.WithVideo, 
-                                                parent_);
+           CallModel relatedCall = new(relatedCallId, origCall.AccUri, parseExt(referTo), false, 
+                                       origCall.HasSecureMedia, origCall.WithVideo, 
+                                       parent_);
            collection_.Add(relatedCall);
         }
 
@@ -1001,7 +1000,7 @@ namespace Siprix
             int startIndex = resp.IndexOf("<state");
             if (startIndex != -1)
             {
-                startIndex = resp.IndexOf(">", startIndex);
+                startIndex = resp.IndexOf('>', startIndex);
                 int endIndex = resp.IndexOf("</state>", startIndex);
                 string blfStateStr = resp.Substring(startIndex + 1, endIndex- startIndex-1);
                 BLFState = blfStateStr switch
@@ -1068,7 +1067,7 @@ namespace Siprix
     /// SubscriptionsListModel
     public class SubscriptionsListModel(ObjModel parent)
     {
-        readonly ObservableCollection<SubscriptionModel> collection_ = new();
+        readonly ObservableCollection<SubscriptionModel> collection_ = [];
         readonly ObjModel parent_ = parent;
 
         public ObservableCollection<SubscriptionModel> Collection { get { return collection_; } }
@@ -1082,8 +1081,8 @@ namespace Siprix
             else                           { subscr.AccUri = parent_.Accounts.getUri(subscr.AccId); }
 
             //Add
-            int err = parent_.Module.Subscription_Add(subscr.Data);
-            if (err != Siprix.Module.kNoErr)
+            int err = parent_.Core.Subscription_Add(subscr.Data);
+            if (err != Siprix.ErrorCode.kNoErr)
             {
                 parent_.Logs?.Print($"Can't add subscription Err: {err} {parent_.ErrorText(err)}");
                 return err;
@@ -1101,8 +1100,8 @@ namespace Siprix
             var subModel = collection_.Where(a => a.ID == subId).FirstOrDefault();
             if (subModel == null) return -1;
 
-            int err = parent_.Module.Subscription_Delete(subId);
-            if (err != Siprix.Module.kNoErr)
+            int err = parent_.Core.Subscription_Delete(subId);
+            if (err != Siprix.ErrorCode.kNoErr)
             {
                 parent_.Logs?.Print($"Can't delete subscription Err: {err} {parent_.ErrorText(err)}");
                 return err;
@@ -1203,9 +1202,8 @@ namespace Siprix
 
         public static Siprix.MessageModel loadFromJson(JsonElement elem, uint internalMsgId)
         {
-            MsgData msgData = new();
-            msgData.MyMsgId = internalMsgId;
-            MessageModel m = new MessageModel(msgData, "");
+            MsgData msgData = new() { MyMsgId = internalMsgId };
+            MessageModel m = new(msgData, "");
             
             foreach (JsonProperty prop in elem.EnumerateObject())
             {
@@ -1233,7 +1231,7 @@ namespace Siprix
     /// MessagesListModel
     public class MessagesListModel(ObjModel parent)
     {
-        readonly ObservableCollection<MessageModel> collection_ = new();
+        readonly ObservableCollection<MessageModel> collection_ = [];
         readonly ObjModel parent_ = parent;
         readonly int kMaxItems = 25;
         uint internalMsgId = 0;
@@ -1245,14 +1243,14 @@ namespace Siprix
             parent_.Logs?.Print($"Sending new message to ext:{msg.ToExt} accId:@{msg.FromAccId}");
 
             //Add
-            int err = parent_.Module.Message_Send(msg);
-            if (err != Siprix.Module.kNoErr)
+            int err = parent_.Core.Message_Send(msg);
+            if (err != Siprix.ErrorCode.kNoErr)
             {
                 parent_.Logs?.Print($"Can't send message Err: {err} {parent_.ErrorText(err)}");
                 return err;
             }
 
-            MessageModel msgModel = new MessageModel(msg, parent_.Accounts.getUri(msg.FromAccId), false);
+            MessageModel msgModel = new(msg, parent_.Accounts.getUri(msg.FromAccId), isWaiting:true);
             collection_.Add(msgModel);
 
             parent_.Logs?.Print($"Posted successfully with id: {msg.MyMsgId}");
@@ -1272,7 +1270,7 @@ namespace Siprix
             parent_.postSaveMessagesChanges();
 
             parent_.Logs?.Print($"Deleted message msgId:{msgId}");
-            return Siprix.Module.kNoErr;
+            return Siprix.ErrorCode.kNoErr;
         }
 
         public void OnMessageSentState(uint messageId, bool success, string response)
@@ -1287,13 +1285,13 @@ namespace Siprix
         {
             parent_.Logs?.Print($"OnMessageIncoming accId:{accId} hdrFrom:{hdrFrom} body:'{body}'");
 
-            Siprix.MsgData msg = new MsgData();
+            Siprix.MsgData msg = new();
             msg.Body = body;
             msg.FromAccId = accId;            
             msg.ToExt = CallsListModel.parseExt(hdrFrom);
             msg.MyMsgId = getInternalMsgId();
 
-            MessageModel msgModel = new MessageModel(msg, parent_.Accounts.getUri(accId), true);
+            MessageModel msgModel = new(msg, parent_.Accounts.getUri(accId), isIncoming:true);
             collection_.Add(msgModel);
 
             if (collection_.Count > kMaxItems) collection_.RemoveAt(0);
@@ -1390,14 +1388,15 @@ namespace Siprix
         readonly NetworkModel networkModel_;
         readonly LogsModel? logsModel_;
 
-        readonly Siprix.Module module_ = new();//Create module
+        readonly Siprix.CoreService core_;
 
         private SiprixEventsHandler? eventHandler_;
 
-        static ObjModel? instance = null;
-
-        ObjModel()
+        public ObjModel()
         {
+            //Create core service
+            core_ = new();
+
             //Create models
             logsModel_ = new LogsModel();
             subscrListModel_ = new SubscriptionsListModel(this);
@@ -1413,21 +1412,12 @@ namespace Siprix
         public CallsListModel Calls    { get { return callsListModel_; } } 
         public NetworkModel Networks { get { return networkModel_; } }
         public LogsModel? Logs    { get { return logsModel_; } }
-        public Siprix.Module Module { get { return module_; } }
-        public string ErrorText(int err) { return module_.ErrorText(err);  }
-
-        public static ObjModel Instance 
-        {
-            get 
-            {
-                instance ??= new ObjModel();
-                return instance;
-            }
-        }
+        public Siprix.CoreService Core { get { return core_; } }
+        public string ErrorText(int err) { return core_.ErrorText(err);  }
 
         public void Initialize(AppDispatcher dispatcher)
         {
-            if (module_.IsInitialized())
+            if (core_.IsInitialized())
                 return;
 
             eventHandler_ = new SiprixEventsHandler(this, dispatcher);
@@ -1439,11 +1429,18 @@ namespace Siprix
             iniData.LogLevelFile = Siprix.LogLevel.Debug;
             iniData.WriteDmpUnhandledExc = true;
     
-            int err = module_.Initialize(eventHandler_, iniData);
+            int err = core_.Initialize(eventHandler_, iniData);
 
-            if(err == Siprix.Module.kNoErr) {
+            //Siprix.VideoData vdoData = new();
+            //vdoData.noCameraImgPath = "noCamera.jpg";//path to image, which SDK will send to remote side instead of camera
+            //vdoData.bitrateKbps = 800;
+            //vdoData.width = 640;
+            //vdoData.height = 480;
+            //core_.Dvc_SetVideoParams(vdoData);
+
+            if (err == Siprix.ErrorCode.kNoErr) {
                 Logs?.Print("Siprix module initialized successfully");
-                Logs?.Print($"Version: {module_.Version()}");
+                Logs?.Print($"Version: {core_.Version()}");
 
                 loadSavedAccounts();
                 loadSavedSubscriptions();
@@ -1456,8 +1453,8 @@ namespace Siprix
 
         public void UnInitialize()
         {
-            int err = module_.UnInitialize();
-            if (err == Siprix.Module.kNoErr){
+            int err = core_.UnInitialize();
+            if (err == Siprix.ErrorCode.kNoErr){
                 Logs?.Print("Siprix module uninitialized");
             }
             else{
@@ -1717,4 +1714,4 @@ namespace Siprix
 
     }//RelayCommand
 
-}//namespace SampleWpf
+}//namespace Siprix
