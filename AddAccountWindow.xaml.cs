@@ -90,6 +90,22 @@ public partial class AddAccountWindow : Window
         this.DialogResult = true;
     }
 
+    private void ShowPassword_Click(object sender, RoutedEventArgs e)
+    {
+        if(tbSipPasswordReveal.Visibility != Visibility.Visible)
+        {
+            tbSipPasswordReveal.Text = tbSipPassword.Password;
+            tbSipPasswordReveal.Visibility = Visibility.Visible;
+            tbSipPassword.Visibility = Visibility.Hidden;
+        }
+        else
+        {
+            tbSipPassword.Password = tbSipPasswordReveal.Text;
+            tbSipPasswordReveal.Visibility = Visibility.Hidden;
+            tbSipPassword.Visibility = Visibility.Visible;
+        }
+    }
+
     public void AddItemsToBindAddressCombobox()
     {
         cbBindAddr.Items.Add("");
