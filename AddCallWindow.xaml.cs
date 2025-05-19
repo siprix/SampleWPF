@@ -1,4 +1,5 @@
 ﻿using System.Windows;
+using System.Windows.Controls;
 
 namespace SampleWpf;
 
@@ -7,13 +8,22 @@ namespace SampleWpf;
 /// </summary>
 public partial class AddCallWindow : Window
 {
-    readonly Siprix.DestData data_;
-    readonly Siprix.ObjModel objModel_;
+    //readonly Siprix.DestData data_;
+    //readonly Siprix.ObjModel objModel_;
+    readonly CallRecentListControl callRecentListCtrl_;
 
     public AddCallWindow(Siprix.ObjModel objModel)
     {
         InitializeComponent();
         Owner = App.Current.MainWindow;
+        this.Width = App.Current.MainWindow.Width * 0.8;
+        this.Height = App.Current.MainWindow.Height * 0.8;
+
+        callRecentListCtrl_ = new CallRecentListControl(objModel, true);
+        callRecentListCtrl_.CancelClick += () => this.DialogResult = false;
+        MainGrid.Children.Add(callRecentListCtrl_);        
+
+        /*
         data_ = new Siprix.DestData();
         objModel_ = objModel;
 
@@ -26,9 +36,9 @@ public partial class AddCallWindow : Window
         cbAccounts.IsEnabled = hasAccounts;
         tbErrText.Visibility = hasAccounts ? Visibility.Collapsed : Visibility.Visible;
 
-        txDestExt.Focus();
+        txDestExt.Focus();*/
     }
-
+    /*
     private void btnCancel_Click(object sender, RoutedEventArgs e)
     {
         this.DialogResult = false;
@@ -54,5 +64,5 @@ public partial class AddCallWindow : Window
         }
 
         this.DialogResult = true;
-    }
+    }*/
 }

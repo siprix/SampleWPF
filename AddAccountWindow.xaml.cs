@@ -44,12 +44,12 @@ public partial class AddAccountWindow : Window
         tbSipServer.Focus();
     }
 
-    private void btnCancel_Click(object sender, RoutedEventArgs e)
+    private void Cancel_Click(object sender, RoutedEventArgs e)
     {
         this.DialogResult = false;
     }
 
-    private void btnOK_Click(object sender, RoutedEventArgs e)
+    private void OK_Click(object sender, RoutedEventArgs e)
     {
         //Check empty
         if ((tbSipServer.Text.Length == 0) ||
@@ -127,7 +127,7 @@ public partial class AddAccountWindow : Window
         }
     }
 
-    private void btnAddLocalAccount_Click(object sender, RoutedEventArgs e)
+    private void AddLocalAccount_Click(object sender, RoutedEventArgs e)
     {
         string? selectedBindAddr = cbBindAddr.SelectedValue?.ToString();
         if (string.IsNullOrEmpty(selectedBindAddr))

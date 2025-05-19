@@ -1,362 +1,367 @@
 ﻿#pragma warning disable IDE1006, IDE0060, IDE0017
 #define WPF_PROJECT
-using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Windows.Input;
 using System.Diagnostics;
 using System.Text.Json;
-using System.Linq;
-using System.Windows;
 
 
-namespace Siprix
+namespace Siprix;
+
+#if WPF_PROJECT
+using AppDispatcher = System.Windows.Threading.Dispatcher;
+#else
+using AppDispatcher = System.Windows.Forms.Control;
+#endif
+
+using JsonDict = Dictionary<string, object>;
+
+/////////////////////////////////////////////////////////////////
+/// AccountModel
+public class AccountModel : INotifyPropertyChanged
 {
-    #if WPF_PROJECT
-    using AppDispatcher = System.Windows.Threading.Dispatcher;
-    #else
-    using AppDispatcher = System.Windows.Forms.Control;
-    #endif
+    public event PropertyChangedEventHandler? PropertyChanged;
+    readonly ObjModel parent_;
+    AccData accData_;
 
-    using JsonDict = Dictionary<string, object>;
+    public AccountModel(AccData accData, ObjModel parent)
+    {
+        this.accData_= accData;
+        this.parent_ = parent;            
+
+        RegState = (accData.ExpireTime == 0) ? RegState.Removed : RegState.InProgress;
+        RegText  = (accData.ExpireTime == 0) ? "Removed"        : "In progress...";
+                    
+        RegisterCommand   = new RelayCommand(Register,   CanRegister);
+        UnRegisterCommand = new RelayCommand(UnRegister, CanUnRegister);
+    }
+            
+    public AccData AccData      { get { return accData_; } }
+    public string Uri               { get { return accData_.SipExtension + "@" + accData_.SipServer; } }
+    public uint ID                  { get { return accData_.MyAccId; } }        
+    public bool IsWaiting           { get { return (RegState == RegState.InProgress); } }
+    public bool HasSecureMedia      { get { return (accData_.SecureMediaMode != null) && 
+                                                   (accData_.SecureMediaMode != SecureMedia.Disabled); } }
+    public string          RegText  { get; private set; }
+    public RegState RegState { get; private set; }
+            
+    public ICommand RegisterCommand   { get; private set; }
+    public ICommand UnRegisterCommand { get; private set; }
     
-    /////////////////////////////////////////////////////////////////
-    /// AccountModel
-    public class AccountModel : INotifyPropertyChanged
+    private void NotifyPropertyChanged([CallerMemberName] string propertyName = "")
     {
-        public event PropertyChangedEventHandler? PropertyChanged;
-        readonly ObjModel parent_;
-        Siprix.AccData accData_;
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+    }
 
-        public AccountModel(Siprix.AccData accData, ObjModel parent)
+    public bool Equals(AccountModel? other) { return (this.ID == other?.ID); }
+
+    public void Update(AccData accData)
+    {
+        this.accData_ = accData;
+    }
+
+    bool CanRegister()   { return (RegState != RegState.InProgress); }
+    bool CanUnRegister() { return (RegState != RegState.InProgress)&&(RegState != RegState.Removed); }
+
+    void Register()
+    {    
+        //Send register request (use 300sec as expire time when account not registered)      
+        uint? expireSec = accData_.ExpireTime;
+        if ((expireSec == null) || (expireSec == 0)) { expireSec = 300; }
+        refreshRegistration(expireSec.Value);
+    }
+
+    void UnRegister()
+    {
+        refreshRegistration(0);
+    }
+
+    int refreshRegistration(uint expireSec)
+    {
+        string cmd = (expireSec != 0) ? "Register" : "Unregister";
+        int err = (expireSec != 0) ? parent_.Core.Account_Register(ID, expireSec)
+                                   : parent_.Core.Account_Unregister(ID);
+                                     
+        if (err != ErrorCode.kNoErr)
         {
-            this.accData_= accData;
-            this.parent_ = parent;            
-
-            RegState = (accData.ExpireTime == 0) ? RegState.Removed : RegState.InProgress;
-            RegText  = (accData.ExpireTime == 0) ? "Removed"        : "In progress...";
-                        
-            RegisterCommand   = new RelayCommand(Register,   CanRegister);
-            UnRegisterCommand = new RelayCommand(UnRegister, CanUnRegister);
-        }
-                
-        public Siprix.AccData AccData   { get { return accData_; } }
-        public string Uri               { get { return accData_.SipExtension + "@" + accData_.SipServer; } }
-        public uint ID                  { get { return accData_.MyAccId; } }        
-        public bool IsWaiting           { get { return (RegState == RegState.InProgress); } }
-        public bool HasSecureMedia      { get { return (accData_.SecureMediaMode != null) && 
-                                                       (accData_.SecureMediaMode != SecureMedia.Disabled); } }
-        public string          RegText  { get; private set; }
-        public Siprix.RegState RegState { get; private set; }
-                
-        public ICommand RegisterCommand   { get; private set; }
-        public ICommand UnRegisterCommand { get; private set; }
-        
-        private void NotifyPropertyChanged([CallerMemberName] string propertyName = "")
-        {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-        }
-
-        public bool Equals(AccountModel? other) { return (this.ID == other?.ID); }
-
-        public void Update(Siprix.AccData accData)
-        {
-            this.accData_ = accData;
-        }
-
-        bool CanRegister()   { return (RegState != RegState.InProgress); }
-        bool CanUnRegister() { return (RegState != RegState.InProgress)&&(RegState != RegState.Removed); }
-
-        void Register()
-        {    
-            //Send register request (use 300sec as expire time when account not registered)      
-            uint? expireSec = accData_.ExpireTime;
-            if ((expireSec == null) || (expireSec == 0)) { expireSec = 300; }
-            refreshRegistration(expireSec.Value);
-        }
-
-        void UnRegister()
-        {
-            refreshRegistration(0);
-        }
-
-        int refreshRegistration(uint expireSec)
-        {
-            string cmd = (expireSec != 0) ? "Register" : "Unregister";
-            int err = (expireSec != 0) ? parent_.Core.Account_Register(ID, expireSec)
-                                       : parent_.Core.Account_Unregister(ID);
-                                         
-            if (err != Siprix.ErrorCode.kNoErr)
-            {
-                parent_.Logs?.Print($"Can't {cmd} AccId:{ID} Err:{err} {parent_.ErrorText(err)}");
-                return err;
-            }
-
-            //Update UI
-            accData_.ExpireTime = expireSec;
-            RegState = RegState.InProgress;
-            NotifyPropertyChanged(nameof(RegState));
-            NotifyPropertyChanged(nameof(IsWaiting));
-
-            //Save changes
-            parent_.postSaveAccountsChanges();
-            parent_.Logs?.Print($"{cmd}ing accId:{ID}");
+            parent_.Logs?.Print($"Can't {cmd} AccId:{ID} Err:{err} {parent_.ErrorText(err)}");
             return err;
         }
+
+        //Update UI
+        accData_.ExpireTime = expireSec;
+        RegState = RegState.InProgress;
+        NotifyPropertyChanged(nameof(RegState));
+        NotifyPropertyChanged(nameof(IsWaiting));
+
+        //Save changes
+        parent_.PostSaveAccountsChanges();
+        parent_.Logs?.Print($"{cmd}ing accId:{ID}");
+        return err;
+    }
+    
+    //Event raised by SDK
+    public void OnAccountRegState(RegState state, string response)
+    {
+        RegState = state;
+        RegText  = response;
+        NotifyPropertyChanged(nameof(RegText));
+        NotifyPropertyChanged(nameof(RegState));
+        NotifyPropertyChanged(nameof(IsWaiting));
+    }
+
+    public JsonDict storeToJson()
+    {
+        JsonDict dict = new();
         
-        //Event raised by SDK
-        public void OnAccountRegState(RegState state, string response)
+        dict.Add("SipServer",    accData_.SipServer);
+        dict.Add("SipExtension", accData_.SipExtension);
+        dict.Add("SipPassword",  accData_.SipPassword);
+        dict.Add("ExpireTime",   accData_.ExpireTime);
+
+        if (accData_.SipAuthId         != null) dict.Add("SipAuthId",         accData_.SipAuthId);
+        if (accData_.SipProxyServer    != null) dict.Add("SipProxyServer",    accData_.SipProxyServer);
+                                                                              
+        if (accData_.UserAgent         != null) dict.Add("UserAgent",         accData_.UserAgent);
+        if (accData_.DisplayName       != null) dict.Add("DisplayName",       accData_.DisplayName);
+        if (accData_.InstanceId        != null) dict.Add("InstanceId",        accData_.InstanceId);
+        if (accData_.RingToneFile      != null) dict.Add("RingToneFile",      accData_.RingToneFile);
+
+        if (accData_.SecureMediaMode   != null) dict.Add("SecureMedia",       accData_.SecureMediaMode.Value);
+        if (accData_.UseSipSchemeForTls!= null) dict.Add("UseSipSchemeForTls",accData_.UseSipSchemeForTls.Value);
+        if (accData_.RtcpMuxEnabled    != null) dict.Add("RtcpMuxEnabled",    accData_.RtcpMuxEnabled.Value);
+        if (accData_.KeepAliveTime     != null) dict.Add("KeepAliveTime",     accData_.KeepAliveTime.Value);
+                                                                    
+        if (accData_.TranspProtocol    != null) dict.Add("TranspProtocol",    accData_.TranspProtocol.Value);
+        if (accData_.TranspPort        != null) dict.Add("TranspPort",        accData_.TranspPort.Value);
+        if (accData_.TranspTlsCaCert   != null) dict.Add("TranspTlsCaCert",   accData_.TranspTlsCaCert);
+        if (accData_.TranspBindAddr    != null) dict.Add("TranspBindAddr",    accData_.TranspBindAddr);
+        if (accData_.TranspPreferIPv6  != null) dict.Add("TranspPreferIPv6",  accData_.TranspPreferIPv6.Value);
+        if (accData_.RewriteContactIp  != null) dict.Add("RewriteContactIp",  accData_.RewriteContactIp.Value);
+        if (accData_.VerifyIncomingCall != null) dict.Add("VerifyIncomingCall", accData_.VerifyIncomingCall.Value);
+                                                                              
+        if (accData_.AudioCodecs       != null) dict.Add("AudioCodecs",       accData_.AudioCodecs);
+        if (accData_.VideoCodecs       != null) dict.Add("VideoCodecs",       accData_.VideoCodecs);
+        if (accData_.Xheaders          != null) dict.Add("Xheaders",          accData_.Xheaders);
+        return dict;            
+
+    }//storeToJson
+
+    internal static AccData loadFromJson(JsonElement elem)
+    {
+        AccData accData = new();
+
+        foreach (JsonProperty prop in elem.EnumerateObject())
         {
-            RegState = state;
-            RegText  = response;
-            NotifyPropertyChanged(nameof(RegText));
-            NotifyPropertyChanged(nameof(RegState));
-            NotifyPropertyChanged(nameof(IsWaiting));
-        }
+            bool isString = (prop.Value.ValueKind == JsonValueKind.String);
+            string strVal = isString ? prop.Value.GetString()! : "";
 
-        public JsonDict storeToJson()
-        {
-            JsonDict dict = new();
-            
-            dict.Add("SipServer",    accData_.SipServer);
-            dict.Add("SipExtension", accData_.SipExtension);
-            dict.Add("SipPassword",  accData_.SipPassword);
-            dict.Add("ExpireTime",   accData_.ExpireTime);
-
-            if (accData_.SipAuthId         != null) dict.Add("SipAuthId",         accData_.SipAuthId);
-            if (accData_.SipProxyServer    != null) dict.Add("SipProxyServer",    accData_.SipProxyServer);
-                                                                                  
-            if (accData_.UserAgent         != null) dict.Add("UserAgent",         accData_.UserAgent);
-            if (accData_.DisplayName       != null) dict.Add("DisplayName",       accData_.DisplayName);
-            if (accData_.InstanceId        != null) dict.Add("InstanceId",        accData_.InstanceId);
-            if (accData_.RingToneFile      != null) dict.Add("RingToneFile",      accData_.RingToneFile);
-
-            if (accData_.SecureMediaMode   != null) dict.Add("SecureMedia",       accData_.SecureMediaMode.Value);
-            if (accData_.UseSipSchemeForTls!= null) dict.Add("UseSipSchemeForTls",accData_.UseSipSchemeForTls.Value);
-            if (accData_.RtcpMuxEnabled    != null) dict.Add("RtcpMuxEnabled",    accData_.RtcpMuxEnabled.Value);
-            if (accData_.KeepAliveTime     != null) dict.Add("KeepAliveTime",     accData_.KeepAliveTime.Value);
-                                                                        
-            if (accData_.TranspProtocol    != null) dict.Add("TranspProtocol",    accData_.TranspProtocol.Value);
-            if (accData_.TranspPort        != null) dict.Add("TranspPort",        accData_.TranspPort.Value);
-            if (accData_.TranspTlsCaCert   != null) dict.Add("TranspTlsCaCert",   accData_.TranspTlsCaCert);
-            if (accData_.TranspBindAddr    != null) dict.Add("TranspBindAddr",    accData_.TranspBindAddr);
-            if (accData_.TranspPreferIPv6  != null) dict.Add("TranspPreferIPv6",  accData_.TranspPreferIPv6.Value);
-            if (accData_.RewriteContactIp  != null) dict.Add("RewriteContactIp",  accData_.RewriteContactIp.Value);
-            if (accData_.VerifyIncomingCall != null) dict.Add("VerifyIncomingCall", accData_.VerifyIncomingCall.Value);
-                                                                                  
-            if (accData_.AudioCodecs       != null) dict.Add("AudioCodecs",       accData_.AudioCodecs);
-            if (accData_.VideoCodecs       != null) dict.Add("VideoCodecs",       accData_.VideoCodecs);
-            if (accData_.Xheaders          != null) dict.Add("Xheaders",          accData_.Xheaders);
-            return dict;            
-
-        }//storeToJson
-
-        public static Siprix.AccData loadFromJson(JsonElement elem)
-        {
-            Siprix.AccData accData = new();
-
-            foreach (JsonProperty prop in elem.EnumerateObject())
+            switch (prop.Name)
             {
-                bool isString = (prop.Value.ValueKind == JsonValueKind.String);
-                string strVal = isString ? prop.Value.GetString()! : "";
+                case "SipServer":          accData.SipServer      = strVal; break;
+                case "SipExtension":       accData.SipExtension   = strVal; break;
+                case "SipPassword":        accData.SipPassword    = strVal; break;
+                case "ExpireTime":         accData.ExpireTime     = prop.Value.GetUInt32(); break;
 
-                switch (prop.Name)
+                case "SipAuthId":          accData.SipAuthId      = strVal; break;
+                case "SipProxyServer":     accData.SipProxyServer = strVal; break;
+                
+                case "UserAgent":          accData.UserAgent      = strVal; break;
+                case "DisplayName":        accData.DisplayName    = strVal; break;                    
+                case "InstanceId":         accData.InstanceId     = strVal; break;
+                case "RingToneFile":       accData.RingToneFile   = strVal; break;
+                
+                
+                case "SecureMedia":        accData.SecureMediaMode    = (SecureMedia)(prop.Value.GetUInt16()); break;
+                case "UseSipSchemeForTls": accData.UseSipSchemeForTls = prop.Value.GetBoolean(); break;
+                case "RtcpMuxEnabled":     accData.RtcpMuxEnabled     = prop.Value.GetBoolean(); break;
+                case "KeepAliveTime":      accData.KeepAliveTime      = prop.Value.GetUInt32(); break;
+                case "TranspProtocol":     accData.TranspProtocol     = (SipTransport)(prop.Value.GetUInt16()); break;
+                case "TranspPort":         accData.TranspPort         = prop.Value.GetUInt16(); break;
+                case "TranspTlsCaCert":    accData.TranspTlsCaCert    = strVal; break;
+                case "TranspPreferIPv6":   accData.TranspPreferIPv6   = prop.Value.GetBoolean(); break;
+                case "RewriteContactIp":   accData.RewriteContactIp   = prop.Value.GetBoolean(); break;
+                case "AudioCodecs":                         
                 {
-                    case "SipServer":          accData.SipServer      = strVal; break;
-                    case "SipExtension":       accData.SipExtension   = strVal; break;
-                    case "SipPassword":        accData.SipPassword    = strVal; break;
-                    case "ExpireTime":         accData.ExpireTime     = prop.Value.GetUInt32(); break;
-
-                    case "SipAuthId":          accData.SipAuthId      = strVal; break;
-                    case "SipProxyServer":     accData.SipProxyServer = strVal; break;
-                    
-                    case "UserAgent":          accData.UserAgent      = strVal; break;
-                    case "DisplayName":        accData.DisplayName    = strVal; break;                    
-                    case "InstanceId":         accData.InstanceId     = strVal; break;
-                    case "RingToneFile":       accData.RingToneFile   = strVal; break;
-                    
-                    
-                    case "SecureMedia":        accData.SecureMediaMode    = (SecureMedia)(prop.Value.GetUInt16()); break;
-                    case "UseSipSchemeForTls": accData.UseSipSchemeForTls = prop.Value.GetBoolean(); break;
-                    case "RtcpMuxEnabled":     accData.RtcpMuxEnabled     = prop.Value.GetBoolean(); break;
-                    case "KeepAliveTime":      accData.KeepAliveTime      = prop.Value.GetUInt32(); break;
-                    case "TranspProtocol":     accData.TranspProtocol     = (SipTransport)(prop.Value.GetUInt16()); break;
-                    case "TranspPort":         accData.TranspPort         = prop.Value.GetUInt16(); break;
-                    case "TranspTlsCaCert":    accData.TranspTlsCaCert    = strVal; break;
-                    case "TranspPreferIPv6":   accData.TranspPreferIPv6   = prop.Value.GetBoolean(); break;
-                    case "RewriteContactIp":   accData.RewriteContactIp   = prop.Value.GetBoolean(); break;
-                    case "AudioCodecs":                         
+                    accData.AudioCodecs = [];
+                    foreach (JsonElement cElem in prop.Value.EnumerateArray())
                     {
-                        accData.AudioCodecs = [];
-                        foreach (JsonElement cElem in prop.Value.EnumerateArray())
-                        {
-                            accData.AudioCodecs.Add((AudioCodec)cElem.GetInt32());
-                        }
-                        break;
+                        accData.AudioCodecs.Add((AudioCodec)cElem.GetInt32());
                     }
+                    break;
+                }
 
-                    case "VideoCodecs": 
+                case "VideoCodecs": 
+                {
+                    accData.VideoCodecs = [];
+                    foreach (JsonElement cElem in prop.Value.EnumerateArray())
                     {
-                        accData.VideoCodecs = [];
-                        foreach (JsonElement cElem in prop.Value.EnumerateArray())
-                        {
-                            accData.VideoCodecs.Add((VideoCodec)cElem.GetInt32());
-                        }
-                        break;
+                        accData.VideoCodecs.Add((VideoCodec)cElem.GetInt32());
                     }
+                    break;
+                }
 
-                    case "Xheaders":                     
+                case "Xheaders":                     
+                {
+                    accData.Xheaders = [];
+                    foreach (JsonProperty xProp in prop.Value.EnumerateObject())
                     {
-                        accData.Xheaders = [];
-                        foreach (JsonProperty xProp in prop.Value.EnumerateObject())
+                        if(xProp.Value.ValueKind == JsonValueKind.String)
                         {
-                            if(xProp.Value.ValueKind == JsonValueKind.String)
-                            {
-                                accData.Xheaders.Add(prop.Name, xProp.Value.GetString()!);
-                            }
+                            accData.Xheaders.Add(prop.Name, xProp.Value.GetString()!);
                         }
-                        break;
                     }
-                }//switch
-            }//for
+                    break;
+                }
+            }//switch
+        }//for
 
-            return accData;
+        return accData;
+    }
 
-        }//loadFromJson
-
-    }//AccountModel
+}//AccountModel
 
 
-    /////////////////////////////////////////////////////////////////
-    /// AccountsListModel
+/////////////////////////////////////////////////////////////////
+/// AccountsListModel
 
-    public class AccountsListModel(ObjModel parent)
+public class AccountsListModel(ObjModel parent_) : INotifyPropertyChanged
+{
+    public event PropertyChangedEventHandler? PropertyChanged;
+    readonly ObservableCollection<AccountModel> collection_ = [];
+    AccountModel? selAccount_;
+
+    public ObservableCollection<AccountModel> Collection { get { return collection_; } }
+
+    public AccountModel? SelectedAccount { 
+        get { return selAccount_;  }
+        set { selAccount_ = value; NotifyPropertyChanged(nameof(SelectedAccount)); }
+    }
+
+    private void NotifyPropertyChanged([CallerMemberName] string propertyName = "")
     {
-        readonly ObservableCollection<AccountModel> collection_ = [];
-        readonly ObjModel parent_ = parent;
-        AccountModel? selAccount_;
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+    }
 
-        public ObservableCollection<AccountModel> Collection { get { return collection_; } }
+    public AccountModel? FindByUri(string uri)
+    {
+        return collection_.Where(a => a.Uri == uri).FirstOrDefault();
+    }
 
-        public AccountModel? SelectedAccount { 
-            get { return selAccount_;  }
-            set { selAccount_ = value; }
-        }
+    public uint GetAccId(string uri)
+    {
+        var accModel = FindByUri(uri);
+        return (accModel == null) ? ErrorCode.kInvalidId : accModel.ID;
+    }
 
-        public uint getAccId(string uri)
+    public string GetUri(uint accId)
+    {
+        var accModel = collection_.Where(a => a.ID == accId).FirstOrDefault();
+        return (accModel == null) ? "?" : accModel.Uri;
+    }
+
+    public bool HasSecureMedia(uint accId)
+    {
+        var accModel = collection_.Where(a => a.ID == accId).FirstOrDefault();
+        return accModel != null && accModel.HasSecureMedia;
+    }
+
+    public AccData? GetData(uint accId)
+    {
+        var accModel = collection_.Where(a => a.ID == accId).FirstOrDefault();
+        return accModel?.AccData;
+    }
+
+    public int Add(AccData accData, bool saveChanges=true)
+    {   
+        parent_.Logs?.Print($"Adding new account: {accData.SipExtension}@{accData.SipServer}");
+
+        int err = parent_.Core.Account_Add(accData);
+        if (err != ErrorCode.kNoErr)
         {
-            var accModel = collection_.Where(a => a.Uri == uri).FirstOrDefault();
-            return (accModel == null) ? Siprix.CoreService.kInvalidId : accModel.ID;
-        }
-        public string getUri(uint accId)
-        {
-            var accModel = collection_.Where(a => a.ID == accId).FirstOrDefault();
-            return (accModel == null) ? "?" : accModel.Uri;
-        }
-
-        public bool hasSecureMedia(uint accId)
-        {
-            var accModel = collection_.Where(a => a.ID == accId).FirstOrDefault();
-            return accModel != null && accModel.HasSecureMedia;
-        }
-
-        public AccData? GetData(uint accId)
-        {
-            var accModel = collection_.Where(a => a.ID == accId).FirstOrDefault();
-            return accModel?.AccData;
-        }
-
-        public int Add(Siprix.AccData accData, bool saveChanges=true)
-        {   
-            parent_.Logs?.Print($"Adding new account: {accData.SipExtension}@{accData.SipServer}");
-
-            int err = parent_.Core.Account_Add(accData);
-            if (err != Siprix.ErrorCode.kNoErr)
-            {
-                parent_.Logs?.Print($"Can't add account Err: {err} {parent_.ErrorText(err)}");
-                return err;
-            }
-
-            AccountModel acc = new(accData, parent_);
-            collection_.Add(acc);
-
-            selAccount_ ??= acc;
-
-            parent_.Logs?.Print($"Added successfully with id: {acc.ID}");
-            if (saveChanges) parent_.postSaveAccountsChanges();
+            parent_.Logs?.Print($"Can't add account Err: {err} {parent_.ErrorText(err)}");
             return err;
         }
 
-        public int Delete(uint accId)
+        AccountModel acc = new(accData, parent_);
+        collection_.Add(acc);
+
+        selAccount_ ??= acc;
+
+        parent_.Logs?.Print($"Added successfully with id: {acc.ID}");
+        if (saveChanges) parent_.PostSaveAccountsChanges();
+        return err;
+    }
+
+    public int Delete(AccountModel acc)
+    {
+        int err = parent_.Core.Account_Delete(acc.ID);
+        if (err != ErrorCode.kNoErr)
         {
-            var accModel = collection_.Where(a => a.ID == accId).FirstOrDefault();
-            if (accModel == null) return -1;
-
-            int err = parent_.Core.Account_Delete(accId);
-            if (err != Siprix.ErrorCode.kNoErr)
-            {
-                parent_.Logs?.Print($"Can't delete account Err: {err} {parent_.ErrorText(err)}");
-                return err;
-            }
-
-            collection_.Remove(accModel);
-
-            if (selAccount_ == accModel)
-                selAccount_ = (collection_.Count > 0) ? collection_[0] : null;
-
-            parent_.postSaveAccountsChanges();
-
-            parent_.Logs?.Print($"Deleted account accId:{accId}");
+            parent_.Logs?.Print($"Can't delete account Err: {err} {parent_.ErrorText(err)}");
             return err;
         }
 
-        public int Update(Siprix.AccData accData)
+        collection_.Remove(acc);
+
+        if (selAccount_ == acc)
+            selAccount_ = (collection_.Count > 0) ? collection_[0] : null;
+
+        parent_.PostSaveAccountsChanges();
+
+        parent_.Logs?.Print($"Deleted account accId:{acc.ID}");
+        return err;
+    }
+
+    public int Update(AccData accData)
+    {
+        var accModel = collection_.Where(a => a.ID == accData.MyAccId).FirstOrDefault();
+        if (accModel == null)
         {
-            var accModel = collection_.Where(a => a.ID == accData.MyAccId).FirstOrDefault();
-            if (accModel == null)
-            {
-                parent_.Logs?.Print("Account with specified id not found");
-                return -1;
-            }
+            parent_.Logs?.Print("Account with specified id not found");
+            return -1;
+        }
 
-            int err = parent_.Core.Account_Update(accData, accData.MyAccId);
-            if (err != Siprix.ErrorCode.kNoErr)
-            {
-                parent_.Logs?.Print($"Can't update account: {err} {{parent_.ErrorText(err)}}");
-                return err;
-            }
-
-            accModel.Update(accData);
-            
-            parent_.postSaveAccountsChanges();
-            parent_.Logs?.Print($"Updated account accId:{accData.MyAccId}");
+        int err = parent_.Core.Account_Update(accData, accData.MyAccId);
+        if (err != ErrorCode.kNoErr)
+        {
+            parent_.Logs?.Print($"Can't update account: {err} {{parent_.ErrorText(err)}}");
             return err;
         }
 
-        //Event raised by SDK
-        public void OnAccountRegState(uint accId, RegState state, string response)
-        {
-            var accModel = collection_.Where(a => a.ID == accId).FirstOrDefault();
-            accModel?.OnAccountRegState(state, response);
-            parent_.Logs?.Print($"OnAccountRegState accId:{accId} state:{state} response:{response}");
-        }
+        accModel.Update(accData);
+        
+        parent_.PostSaveAccountsChanges();
+        parent_.Logs?.Print($"Updated account accId:{accData.MyAccId}");
+        return err;
+    }
 
-        public string storeToJson()
-        {
-            List<JsonDict> jsonList = [];
-            foreach(var accModel in collection_)
-            {
-                jsonList.Add(accModel.storeToJson());
-            }
-            return JsonSerializer.Serialize(jsonList);
-        }
-        public void loadFromJson(string jsonString)
-        {
-            if (jsonString.Length == 0) return;
+    //Event raised by SDK
+    public void OnAccountRegState(uint accId, RegState state, string response)
+    {
+        var accModel = collection_.Where(a => a.ID == accId).FirstOrDefault();
+        accModel?.OnAccountRegState(state, response);
+        parent_.Logs?.Print($"OnAccountRegState accId:{accId} state:{state} response:{response}");
+    }
 
+    public void StoreToJson()
+    {
+        List<JsonDict> jsonList = [];
+        foreach(var accModel in collection_) jsonList.Add(accModel.storeToJson());
+
+        SampleWpf.Properties.Settings.Default.accounts = JsonSerializer.Serialize(jsonList);
+        SampleWpf.Properties.Settings.Default.Save();
+    }
+    public void LoadFromJson()
+    {
+        parent_.Logs?.Print("Loading accounts...");
+        string jsonString = SampleWpf.Properties.Settings.Default.accounts;
+
+        if (jsonString.Length != 0)
+        {
             collection_.Clear();
-
             using (JsonDocument document = JsonDocument.Parse(jsonString))
             {
                 foreach (JsonElement element in document.RootElement.EnumerateArray())
@@ -365,778 +370,781 @@ namespace Siprix
                 }
             }
         }
+        parent_.Logs?.Print($"Loaded {Collection.Count} accounts");
+    }
 
-    }//AccountsListModel
-
-
-    /////////////////////////////////////////////////////////////////
-    /// CallModel
-    public class CallModel : INotifyPropertyChanged
-    {
-        readonly uint myCallId_;
-        readonly string accUri_;     //Account URI used to accept/make this call
-        readonly string remoteExt_;  //Phone number(extension) of remote side  
-        readonly bool isIncoming_;
-        readonly bool hasSecureMedia_;
-                
-        CallState callState_;
-        HoldState holdState_;
-        DateTime startTime_;
-
-        string displName_ = "";      //Contact name
-        string receivedDtmf_ = "";
-        string duration_ = "";
-        //string response_ = "";
-        bool micMuted_ = false;
-        bool camMuted_ = false;
-        bool withVideo_;
-        bool isFilePlaying_ = false;
-        bool isFileRecording_ = false;
-        readonly List<uint> playerIds_ = [];        
-
-        public event PropertyChangedEventHandler? PropertyChanged;
-        readonly ObjModel parent_;
-        
-        public CallModel(uint myCallId, string accUri, string remoteExt, 
-                        bool isIncoming, bool hasSecureMedia, bool withVideo,
-                        ObjModel parent)
-        {
-            myCallId_   = myCallId;
-            accUri_     = accUri;
-            remoteExt_  = remoteExt;
-            withVideo_  = withVideo;
-            isIncoming_ = isIncoming;
-            hasSecureMedia_ = hasSecureMedia;
-
-            callState_ = isIncoming ? CallState.Ringing : CallState.Dialing;
-
-            parent_    = parent;
-
-            AcceptCommand   = new RelayCommand(() => Accept(true));
-            RejectCommand   = new RelayCommand(() => Reject());
-            SwitchToCommand = new RelayCommand(() => SwitchTo());
-            HoldCommand     = new RelayCommand(() => Hold());
-            MuteMicCommand  = new RelayCommand(() => MuteMic(!micMuted_));
-            MuteCamCommand  = new RelayCommand(() => MuteCam(!camMuted_));
-            HangupCommand   = new RelayCommand(() => Bye());
-        }
-        
-        public string NameAndExt { get { 
-            return (displName_.Length == 0) ? remoteExt_ : $"{displName_} ({remoteExt_})"; } 
-        }
-       
-        public uint   ID                { get { return myCallId_;       } }
-        public CallState CallState      { get { return callState_;      } }
-        public HoldState HoldState      { get { return holdState_;      } }
-        public string Duration          { get { return duration_;       } }
-        public bool   HasSecureMedia    { get { return hasSecureMedia_; } }
-        public bool   IsIncoming        { get { return isIncoming_;     } }
-        public bool   IsSwitchedCall    { get { return parent_.Calls.IsSwitchedCall(ID); } }
-        public bool   IsWaiting         { get { return (callState_ != CallState.Connected) &&(callState_ != CallState.Held); } }
-        public bool   IsConnected       { get { return (callState_ == CallState.Connected); } }
-        public bool   IsRinging         { get { return (callState_ == CallState.Ringing);   } }
-        public bool   IsFilePlaying     { get { return isFilePlaying_; } }
-        public bool   IsFileRecording   { get { return isFileRecording_; } }        
-        public bool   WithVideo         { get { return withVideo_;      } }
-        public bool   IsMicMuted        { get { return micMuted_;       } }
-        public bool   IsCamMuted        { get { return camMuted_;       } }
-        public string AccUri            { get { return accUri_;         } }
-        public string ReceivedDtmf      { get { return receivedDtmf_;   } }
-
-        public ICommand AcceptCommand   { get; private set; }
-        public ICommand RejectCommand   { get; private set; }
-        public ICommand SwitchToCommand { get; private set; }
-        public ICommand HoldCommand     { get; private set; }
-        public ICommand MuteMicCommand  { get; private set; }
-        public ICommand MuteCamCommand { get; private set; }
-        public ICommand HangupCommand   { get; private set; }
-
-        public bool CanAccept           { get { return callState_ == CallState.Ringing; } }
-        public bool CanReject           { get { return callState_ == CallState.Ringing; } }        
-        public bool CanHold             { get { return (callState_ == CallState.Connected) || (callState_ == CallState.Held); } }
-        public bool CanMuteMic          { get { return callState_ == CallState.Connected; } }
-        public bool CanMuteCam          { get { return (callState_ == CallState.Connected) && withVideo_ ; } }
-        public bool CanHangup           { get { return callState_ != CallState.Ringing; }}
-        public bool CanSwitchTo         { get { return !IsSwitchedCall;  } }
-
-        public void setDisplName(string name) { displName_ = name;  NotifyPropertyChanged(nameof(NameAndExt)); }
-        void setMicMuted(bool muted)          { micMuted_  = muted; NotifyPropertyChanged(nameof(IsMicMuted)); }
-        void setCamMuted(bool muted)          { camMuted_  = muted; NotifyPropertyChanged(nameof(IsCamMuted)); }
-        void setWithVideo(bool video)         { withVideo_ = video; NotifyPropertyChanged(nameof(WithVideo)); }
+}//AccountsListModel
 
 
-        private void NotifyPropertyChanged([CallerMemberName] string propertyName = "")
-        {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-        }
-
-        private void setCallState(CallState newState)
-        {
-            callState_ = newState;
-            NotifyPropertyChanged(nameof(CallState));
-            NotifyPropertyChanged(nameof(IsWaiting));
-            NotifyPropertyChanged(nameof(IsConnected));
-            NotifyPropertyChanged(nameof(IsRinging));
-            NotifyPropertyChanged(nameof(CanAccept));
-            NotifyPropertyChanged(nameof(CanReject));
-            NotifyPropertyChanged(nameof(CanHold));
-            NotifyPropertyChanged(nameof(CanMuteMic));
-            NotifyPropertyChanged(nameof(CanMuteCam));
-        }
-
-        private void setHoldState(HoldState holdState)
-        {
-            holdState_ = holdState;
-            NotifyPropertyChanged(nameof(HoldState));
-        }
-
-        public bool Equals(CallModel? other) { 
-            return (this.myCallId_ == other?.myCallId_); 
-        }
-        
-        public void CalcDuration()
-        {
-            if (callState_ != CallState.Connected) return;
-
-            TimeSpan span = (DateTime.Now - startTime_);
-            duration_ = (span.Hours !=0) ? string.Format("{0}:{1:D2}:{2:D2}", span.Hours, span.Minutes, span.Seconds)
-                                         : string.Format("{0:D2}:{1:D2}", span.Minutes, span.Seconds);
-            NotifyPropertyChanged(nameof(Duration));
-        }
-
-        public int SwitchTo()
-        {
-            return parent_.Calls.SwitchTo(myCallId_);
-        }
-
-        public int Bye()
-        {
-            parent_.Logs?.Print($"Ending callId:{myCallId_}");
-            int err = parent_.Core.Call_Bye(myCallId_);
-            if (err == Siprix.ErrorCode.kNoErr) setCallState(CallState.Disconnecting);
-            else  parent_.Logs?.Print($"Cant Bye callId:{myCallId_} Err:{err} {parent_.ErrorText(err)}");
-            return err;
-        }
-
-        public int Accept(bool withVideo)
-        {
-            parent_.Logs?.Print($"Accepting callId:{myCallId_}");
-            int err = parent_.Core.Call_Accept(myCallId_, withVideo);
-            if (err == Siprix.ErrorCode.kNoErr) setCallState(CallState.Accepting);
-            else parent_.Logs?.Print($"Cant Accept callId:{myCallId_} Err:{err} {parent_.ErrorText(err)}");
-            return err;
-        }
-
-        public int Reject()
-        {
-            parent_.Logs?.Print($"Rejecting callId:{myCallId_}");
-            int err = parent_.Core.Call_Reject(myCallId_);//Send '486 Busy now'
-            if (err == Siprix.ErrorCode.kNoErr) setCallState(CallState.Rejecting);
-            else parent_.Logs?.Print($"Cant Reject callId:{myCallId_} Err:{err} {parent_.ErrorText(err)}");
-            return err;
-        }
-
-        public int MuteMic(bool mute)
-        {
-            parent_.Logs?.Print($"Set mic mute={mute} of call {myCallId_}");
-            int err = parent_.Core.Call_MuteMic(myCallId_, mute);
-            if (err == Siprix.ErrorCode.kNoErr) setMicMuted(mute);
-            else parent_.Logs?.Print($"Cant MuteMic callId:{myCallId_} Err:{err} {parent_.ErrorText(err)}");
-            return err;
-        }
-
-        public int MuteCam(bool mute)
-        {
-            parent_.Logs?.Print($"Set camera mute={mute} of call {myCallId_}");
-            int err = parent_.Core.Call_MuteCam(myCallId_, mute);
-            if (err == Siprix.ErrorCode.kNoErr) setCamMuted(mute);
-            else parent_.Logs?.Print($"Cant MuteCam callId:{myCallId_} Err:{err} {parent_.ErrorText(err)}");
-            return err;
-        }
-
-        public int SendDtmf(string tone)
-        {
-            parent_.Logs?.Print($"Sending dtmf callId:{myCallId_} tone:{tone}");
-            int err = parent_.Core.Call_SendDtmf(myCallId_, tone, 200, 50, DtmfMethod.DTMF_RTP);
-            if (err != Siprix.ErrorCode.kNoErr) 
-               parent_.Logs?.Print($"Cant SendDtmf callId:{myCallId_} Err:{err} {parent_.ErrorText(err)}");
-            return err;        
-        }
-
-        public int PlayFile(string pathToMp3File, bool loop)
-        {
-            parent_.Logs?.Print($"Starting play file callId:{myCallId_} {pathToMp3File}");
-            uint playerId = 0;
-            int err = parent_.Core.Call_PlayFile(myCallId_, pathToMp3File, loop, ref playerId);
-            if (err != Siprix.ErrorCode.kNoErr)
-                parent_.Logs?.Print($"Cant PlayFile callId:{myCallId_} Err:{err} {parent_.ErrorText(err)}");
-            else
-                playerIds_.Add(playerId);
-            return err;
-        }
-
-        public int StopPlayFile()
-        {
-            int retErr = Siprix.ErrorCode.kNoErr;
-            foreach(var playerId in playerIds_)
-            {
-                parent_.Logs?.Print($"Stop play file in callId:{myCallId_} playerId:{playerId}");
-                int err = parent_.Core.Call_StopFile(playerId);
-                if (err != Siprix.ErrorCode.kNoErr) {
-                    parent_.Logs?.Print($"Cant StopPlayFile Err:{err} {parent_.ErrorText(err)}");
-                    retErr = err;
-                }
-            }
-            return retErr;
-        }
-
-        public int RecordFile(string path)
-        {
-            parent_.Logs?.Print($"Start record file for callId:{myCallId_} path:{path}");
-            int err = parent_.Core.Call_RecordFile(myCallId_, path);
-            if (err != Siprix.ErrorCode.kNoErr)
-                parent_.Logs?.Print($"Cant StartRecording Err:{err} {parent_.ErrorText(err)}");
-            else
-                isFileRecording_ = true;
-            return err;
-        }
-
-        public int StopRecordFile()
-        {
-            parent_.Logs?.Print($"Stop record file for callId:{myCallId_}");
-            int err = parent_.Core.Call_StopRecordFile(myCallId_);
-            if (err != Siprix.ErrorCode.kNoErr)
-                parent_.Logs?.Print($"Cant StopRecording Err:{err} {parent_.ErrorText(err)}");
-            else
-                isFileRecording_ = false;
-            return err;
-        }
-
-        public int Hold()
-        {
-            parent_.Logs?.Print($"Hold callId:{myCallId_}");
-            int err = parent_.Core.Call_Hold(myCallId_);
-            if (err == Siprix.ErrorCode.kNoErr) setCallState(CallState.Holding);
-            else parent_.Logs?.Print($"Cant MuteMic callId:{myCallId_} Err:{err} {parent_.ErrorText(err)}");
-            return err;
-        }
-
-        public int TransferBlind(string toExt)
-        {
-            parent_.Logs?.Print($"Transfer blind callId:{myCallId_} to:{toExt}");
-            if (toExt.Length==0) return -1;
-
-            int err = parent_.Core.Call_TransferBlind(myCallId_, toExt);
-            if (err == Siprix.ErrorCode.kNoErr) setCallState(CallState.Transferring);
-            else parent_.Logs?.Print($"Cant TransferBlind callId:{myCallId_} Err:{err} {parent_.ErrorText(err)}");
-            return err;
-        }
-
-        public int TransferAttended(uint toCallId)
-        {
-            parent_.Logs?.Print($"Transfer attended callId:{myCallId_} to callId:{toCallId}");
-            int err = parent_.Core.Call_TransferAttended(myCallId_, toCallId);
-            if (err == Siprix.ErrorCode.kNoErr) setCallState(CallState.Transferring);
-            else parent_.Logs?.Print($"Cant TransferAttended callId:{myCallId_} Err:{err} {parent_.ErrorText(err)}");
-            return err;            
-        }
-        public int SetVideoWindow(IntPtr hwnd)
-        {
-            parent_.Logs?.Print($"SetVideoWindow callId:{myCallId_} hwnd:{hwnd}");
-            return parent_.Core.Call_SetVideoWindow(myCallId_, hwnd);
-        }
-
-        public string GetSipHeader(string hdrName)
-        {
-            return parent_.Core.Call_GetSipHeader(myCallId_, hdrName);
-        }
-
-        //Events raised by SDK
-        public void OnCallProceeding(string response)
-        {
-            //response_ = response;
-            setCallState(CallState.Proceeding);
-        }
-
-        public void OnCallConnected(string hdrFrom, string hdrTo, bool withVideo)
-        {
-            startTime_ = DateTime.Now;
-            setWithVideo(withVideo);
-            setCallState(CallState.Connected);
-        }
-
-        public void OnCallTransferred(uint statusCode)
-        {
-            setCallState(CallState.Connected);
-        }
-
-        public void OnCallDtmfReceived(ushort tone)
-        {
-            if(tone == 10) { receivedDtmf_ += '*'; }else
-            if(tone == 11) { receivedDtmf_ += '#'; }
-            else           { receivedDtmf_ += tone.ToString(); }
-            NotifyPropertyChanged(nameof(ReceivedDtmf));
-        }
-
-        public void OnCallHeld(HoldState holdState)
-        {
-            setHoldState(holdState);
-            setCallState((holdState_ == HoldState.None) ? CallState.Connected : CallState.Held);            
-        }
-
-        public void OnCallSwitched()
-        {
-            NotifyPropertyChanged(nameof(IsSwitchedCall));
-            NotifyPropertyChanged(nameof(CanSwitchTo));
-        }
-
-        public void OnPlayerState(uint playerId, PlayerState state)
-        {
-            if (playerIds_.Contains(playerId)) return;
+/////////////////////////////////////////////////////////////////
+/// CallModel
+public class CallModel : INotifyPropertyChanged
+{
+    readonly uint myCallId_;
+    readonly string accUri_;     //Account URI used to accept/make this call
+    readonly string remoteExt_;  //Phone number(extension) of remote side  
+    readonly bool isIncoming_;
+    readonly bool hasSecureMedia_;
             
-            if((state == PlayerState.PlayerStopped) || (state == PlayerState.PlayerFailed))
-                playerIds_.Remove(playerId);
+    CallState callState_;
+    HoldState holdState_;
+    DateTime startTime_;
 
-            bool prevPlayingState = isFilePlaying_;
-            isFilePlaying_ = playerIds_.Count > 0;
+    string displName_ = "";      //Contact name
+    string receivedDtmf_ = "";
+    string duration_ = "";
+    //string response_ = "";
+    bool micMuted_ = false;
+    bool camMuted_ = false;
+    bool withVideo_;
+    bool isFilePlaying_ = false;
+    bool isFileRecording_ = false;
+    readonly List<uint> playerIds_ = [];        
 
-            if(prevPlayingState != isFilePlaying_)
-                NotifyPropertyChanged(nameof(IsFilePlaying));
-        }
-
-    }//CallModel
-
-
-    /////////////////////////////////////////////////////////////////
-    /// CallsListModel
-
-    public class CallsListModel(ObjModel parent) : INotifyPropertyChanged
+    public event PropertyChangedEventHandler? PropertyChanged;
+    readonly ObjModel parent_;
+    
+    public CallModel(uint myCallId, string accUri, string remoteExt, 
+                    bool isIncoming, bool hasSecureMedia, bool withVideo,
+                    ObjModel parent)
     {
-        public event PropertyChangedEventHandler? PropertyChanged;
-        readonly ObservableCollection<CallModel> collection_ = [];
-        readonly ObjModel parent_ = parent;
+        myCallId_   = myCallId;
+        accUri_     = accUri;
+        remoteExt_  = remoteExt;
+        withVideo_  = withVideo;
+        isIncoming_ = isIncoming;
+        hasSecureMedia_ = hasSecureMedia;
 
-        CallModel? switchedCall_;
-        uint lastIncomingCallId_ = Siprix.CoreService.kInvalidId;
-        bool confModeStarted_ = false;
+        callState_ = isIncoming ? CallState.Ringing : CallState.Dialing;
 
-        public ObservableCollection<CallModel> Collection { get { return collection_; } }
+        parent_    = parent;
 
-        private void NotifyPropertyChanged([CallerMemberName] string propertyName = "")
+        AcceptCommand   = new RelayCommand(() => Accept(true));
+        RejectCommand   = new RelayCommand(() => Reject());
+        SwitchToCommand = new RelayCommand(() => SwitchTo());
+        HoldCommand     = new RelayCommand(() => Hold());
+        MuteMicCommand  = new RelayCommand(() => MuteMic(!micMuted_));
+        MuteCamCommand  = new RelayCommand(() => MuteCam(!camMuted_));
+        HangupCommand   = new RelayCommand(() => Bye());
+    }
+    
+    public string NameAndExt { get { 
+        return (displName_.Length == 0) ? remoteExt_ : $"{displName_} ({remoteExt_})"; } 
+    }
+   
+    public uint   ID                { get { return myCallId_;       } }
+    public CallState CallState      { get { return callState_;      } }
+    public HoldState HoldState      { get { return holdState_;      } }
+    public string Duration          { get { return duration_;       } }
+    public bool   HasSecureMedia    { get { return hasSecureMedia_; } }
+    public bool   IsIncoming        { get { return isIncoming_;     } }
+    public bool   IsSwitchedCall    { get { return parent_.Calls.IsSwitchedCall(ID); } }
+    public bool   IsWaiting         { get { return (callState_ != CallState.Connected) &&(callState_ != CallState.Held); } }
+    public bool   IsLocalHold       { get { return (holdState_ == HoldState.Local) || (holdState_ == HoldState.LocalAndRemote); } }
+    public bool   IsConnected       { get { return (callState_ == CallState.Connected); } }
+    public bool   IsRinging         { get { return (callState_ == CallState.Ringing);   } }
+    public bool   IsFilePlaying     { get { return isFilePlaying_; } }
+    public bool   IsFileRecording   { get { return isFileRecording_; } }        
+    public bool   WithVideo         { get { return withVideo_;      } }
+    public bool   IsMicMuted        { get { return micMuted_;       } }
+    public bool   IsCamMuted        { get { return camMuted_;       } }
+    public string AccUri            { get { return accUri_;         } }
+    public string ReceivedDtmf      { get { return receivedDtmf_;   } }
+
+    public ICommand AcceptCommand   { get; private set; }
+    public ICommand RejectCommand   { get; private set; }
+    public ICommand SwitchToCommand { get; private set; }
+    public ICommand HoldCommand     { get; private set; }
+    public ICommand MuteMicCommand  { get; private set; }
+    public ICommand MuteCamCommand { get; private set; }
+    public ICommand HangupCommand   { get; private set; }
+
+    public bool CanAccept           { get { return callState_ == CallState.Ringing; } }
+    public bool CanReject           { get { return callState_ == CallState.Ringing; } }        
+    public bool CanHold             { get { return (callState_ == CallState.Connected) || (callState_ == CallState.Held); } }
+    public bool CanMuteMic          { get { return callState_ == CallState.Connected; } }
+    public bool CanMuteCam          { get { return (callState_ == CallState.Connected) && withVideo_ ; } }
+    public bool CanHangup           { get { return callState_ != CallState.Ringing; }}
+    public bool CanSwitchTo         { get { return !IsSwitchedCall;  } }
+
+    public void setDisplName(string name) { displName_ = name;  NotifyPropertyChanged(nameof(NameAndExt)); }
+    void setMicMuted(bool muted)          { micMuted_  = muted; NotifyPropertyChanged(nameof(IsMicMuted)); }
+    void setCamMuted(bool muted)          { camMuted_  = muted; NotifyPropertyChanged(nameof(IsCamMuted)); }
+    void setWithVideo(bool video)         { withVideo_ = video; NotifyPropertyChanged(nameof(WithVideo)); }
+
+    private void NotifyPropertyChanged([CallerMemberName] string propertyName = "")
+    {
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+    }
+
+    private void setCallState(CallState newState)
+    {
+        callState_ = newState;
+        NotifyPropertyChanged(nameof(CallState));
+        NotifyPropertyChanged(nameof(IsWaiting));
+        NotifyPropertyChanged(nameof(IsConnected));
+        NotifyPropertyChanged(nameof(IsRinging));
+        NotifyPropertyChanged(nameof(CanAccept));
+        NotifyPropertyChanged(nameof(CanReject));
+        NotifyPropertyChanged(nameof(CanHold));
+        NotifyPropertyChanged(nameof(CanMuteMic));
+        NotifyPropertyChanged(nameof(CanMuteCam));
+    }
+
+    private void setHoldState(HoldState holdState)
+    {
+        holdState_ = holdState;
+        NotifyPropertyChanged(nameof(HoldState));
+        NotifyPropertyChanged(nameof(IsLocalHold));
+    }
+
+    public bool Equals(CallModel? other) { 
+        return (this.myCallId_ == other?.myCallId_); 
+    }
+    
+    public void CalcDuration()
+    {
+        if (callState_ != CallState.Connected) return;
+
+        TimeSpan span = (DateTime.Now - startTime_);
+        duration_ = (span.Hours !=0) ? string.Format("{0}:{1:D2}:{2:D2}", span.Hours, span.Minutes, span.Seconds)
+                                     : string.Format("{0:D2}:{1:D2}", span.Minutes, span.Seconds);
+        NotifyPropertyChanged(nameof(Duration));
+    }
+
+    public int SwitchTo()
+    {
+        return parent_.Calls.SwitchTo(myCallId_);
+    }
+
+    public int Bye()
+    {
+        parent_.Logs?.Print($"Ending callId:{myCallId_}");
+        int err = parent_.Core.Call_Bye(myCallId_);
+        if (err == ErrorCode.kNoErr) setCallState(CallState.Disconnecting);
+        else  parent_.Logs?.Print($"Cant Bye callId:{myCallId_} Err:{err} {parent_.ErrorText(err)}");
+        return err;
+    }
+
+    public int Accept(bool withVideo)
+    {
+        parent_.Logs?.Print($"Accepting callId:{myCallId_}");
+        int err = parent_.Core.Call_Accept(myCallId_, withVideo);
+        if (err == ErrorCode.kNoErr) setCallState(CallState.Accepting);
+        else parent_.Logs?.Print($"Cant Accept callId:{myCallId_} Err:{err} {parent_.ErrorText(err)}");
+        return err;
+    }
+
+    public int Reject()
+    {
+        parent_.Logs?.Print($"Rejecting callId:{myCallId_}");
+        int err = parent_.Core.Call_Reject(myCallId_);//Send '486 Busy now'
+        if (err == ErrorCode.kNoErr) setCallState(CallState.Rejecting);
+        else parent_.Logs?.Print($"Cant Reject callId:{myCallId_} Err:{err} {parent_.ErrorText(err)}");
+        return err;
+    }
+
+    public int MuteMic(bool mute)
+    {
+        parent_.Logs?.Print($"Set mic mute={mute} of call {myCallId_}");
+        int err = parent_.Core.Call_MuteMic(myCallId_, mute);
+        if (err == ErrorCode.kNoErr) setMicMuted(mute);
+        else parent_.Logs?.Print($"Cant MuteMic callId:{myCallId_} Err:{err} {parent_.ErrorText(err)}");
+        return err;
+    }
+
+    public int MuteCam(bool mute)
+    {
+        parent_.Logs?.Print($"Set camera mute={mute} of call {myCallId_}");
+        int err = parent_.Core.Call_MuteCam(myCallId_, mute);
+        if (err == ErrorCode.kNoErr) setCamMuted(mute);
+        else parent_.Logs?.Print($"Cant MuteCam callId:{myCallId_} Err:{err} {parent_.ErrorText(err)}");
+        return err;
+    }
+
+    public int SendDtmf(string tone)
+    {
+        parent_.Logs?.Print($"Sending dtmf callId:{myCallId_} tone:{tone}");
+        int err = parent_.Core.Call_SendDtmf(myCallId_, tone, 200, 50, DtmfMethod.DTMF_RTP);
+        if (err != ErrorCode.kNoErr) 
+           parent_.Logs?.Print($"Cant SendDtmf callId:{myCallId_} Err:{err} {parent_.ErrorText(err)}");
+        return err;        
+    }
+
+    public int PlayFile(string pathToMp3File, bool loop)
+    {
+        parent_.Logs?.Print($"Starting play file callId:{myCallId_} {pathToMp3File}");
+        uint playerId = 0;
+        int err = parent_.Core.Call_PlayFile(myCallId_, pathToMp3File, loop, ref playerId);
+        if (err != ErrorCode.kNoErr)
+            parent_.Logs?.Print($"Cant PlayFile callId:{myCallId_} Err:{err} {parent_.ErrorText(err)}");
+        else
+            playerIds_.Add(playerId);
+        return err;
+    }
+
+    public int StopPlayFile()
+    {
+        int retErr = ErrorCode.kNoErr;
+        foreach(var playerId in playerIds_)
         {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-        }
-
-        public bool IsSwitchedCall(uint callId)
-        {
-            return switchedCall_ != null && (switchedCall_.ID == callId);
-        }
-
-        public uint LastIncomingCallId() { return lastIncomingCallId_; }
-
-        public CallModel? SwitchedCall
-        {
-            get { return switchedCall_; }
-            private set { switchedCall_ = value; NotifyPropertyChanged(); }
-        }
-
-        public bool ConfModeStarted
-        {
-            get { return confModeStarted_; }
-            private set { confModeStarted_ = value; NotifyPropertyChanged(); }
-        }
-
-        public void CalcDuration()
-        {
-            foreach(var c in collection_) c.CalcDuration();
-        }
-
-        public int Invite(Siprix.DestData dest)
-        {
-            parent_.Logs?.Print($"Trying to invite {dest.ToExt} from account:{dest.FromAccId}");
-
-            int err = parent_.Core.Call_Invite(dest);
-            if (err != Siprix.ErrorCode.kNoErr)
-            {
-                parent_.Logs?.Print($"Can't invite Err: {err} {parent_.ErrorText(err)}");
-                return err;
+            parent_.Logs?.Print($"Stop play file in callId:{myCallId_} playerId:{playerId}");
+            int err = parent_.Core.Call_StopFile(playerId);
+            if (err != ErrorCode.kNoErr) {
+                parent_.Logs?.Print($"Can't StopPlayFile Err:{err} {parent_.ErrorText(err)}");
+                retErr = err;
             }
+        }
+        return retErr;
+    }
 
-            string accUri       = parent_.Accounts.getUri(dest.FromAccId);
-            bool hasSecureMedia = parent_.Accounts.hasSecureMedia(dest.FromAccId);
+    public int RecordFile(string path)
+    {
+        parent_.Logs?.Print($"Start record file for callId:{myCallId_} path:{path}");
+        int err = parent_.Core.Call_RecordFile(myCallId_, path);
+        if (err != ErrorCode.kNoErr)
+            parent_.Logs?.Print($"Cant StartRecording Err:{err} {parent_.ErrorText(err)}");
+        else
+            isFileRecording_ = true;
+        NotifyPropertyChanged(nameof(IsFileRecording));
+        return err;
+    }
 
-            CallModel newCall = new(dest.MyCallId, accUri, dest.ToExt, false, hasSecureMedia, dest.WithVideo, parent_);
-            collection_.Add(newCall);
-            //_cdrs?.add(newCall);             //TODO add CDR
-            
-            parent_.postResolveContactName_(newCall);
+    public int StopRecordFile()
+    {
+        parent_.Logs?.Print($"Stop record file for callId:{myCallId_}");
+        int err = parent_.Core.Call_StopRecordFile(myCallId_);
+        if (err != ErrorCode.kNoErr)
+            parent_.Logs?.Print($"Cant StopRecording Err:{err} {parent_.ErrorText(err)}");
+        else
+            isFileRecording_ = false;
+        NotifyPropertyChanged(nameof(IsFileRecording));
+        return err;
+    }
+
+    public int Hold()
+    {
+        parent_.Logs?.Print($"Hold callId:{myCallId_}");
+        int err = parent_.Core.Call_Hold(myCallId_);
+        if (err == ErrorCode.kNoErr) setCallState(CallState.Holding);
+        else parent_.Logs?.Print($"Cant MuteMic callId:{myCallId_} Err:{err} {parent_.ErrorText(err)}");
+        return err;
+    }
+
+    public int TransferBlind(string toExt)
+    {
+        parent_.Logs?.Print($"Transfer blind callId:{myCallId_} to:{toExt}");
+        if (toExt.Length==0) return -1;
+
+        int err = parent_.Core.Call_TransferBlind(myCallId_, toExt);
+        if (err == ErrorCode.kNoErr) setCallState(CallState.Transferring);
+        else parent_.Logs?.Print($"Cant TransferBlind callId:{myCallId_} Err:{err} {parent_.ErrorText(err)}");
+        return err;
+    }
+
+    public int TransferAttended(uint toCallId)
+    {
+        parent_.Logs?.Print($"Transfer attended callId:{myCallId_} to callId:{toCallId}");
+        int err = parent_.Core.Call_TransferAttended(myCallId_, toCallId);
+        if (err == ErrorCode.kNoErr) setCallState(CallState.Transferring);
+        else parent_.Logs?.Print($"Cant TransferAttended callId:{myCallId_} Err:{err} {parent_.ErrorText(err)}");
+        return err;            
+    }
+    public int SetVideoWindow(IntPtr hwnd)
+    {
+        parent_.Logs?.Print($"SetVideoWindow callId:{myCallId_} hwnd:{hwnd}");
+        return parent_.Core.Call_SetVideoWindow(myCallId_, hwnd);
+    }
+
+    public string GetSipHeader(string hdrName)
+    {
+        return parent_.Core.Call_GetSipHeader(myCallId_, hdrName);
+    }
+
+    //Events raised by SDK
+    public void OnCallProceeding(string response)
+    {
+        //response_ = response;
+        setCallState(CallState.Proceeding);
+    }
+
+    public void OnCallConnected(string hdrFrom, string hdrTo, bool withVideo)
+    {
+        startTime_ = DateTime.Now;
+        setWithVideo(withVideo);
+        setCallState(CallState.Connected);
+    }
+
+    public void OnCallTransferred(uint statusCode)
+    {
+        setCallState(CallState.Connected);
+    }
+
+    public void OnCallDtmfReceived(ushort tone)
+    {
+        if(tone == 10) { receivedDtmf_ += '*'; }else
+        if(tone == 11) { receivedDtmf_ += '#'; }
+        else           { receivedDtmf_ += tone.ToString(); }
+        NotifyPropertyChanged(nameof(ReceivedDtmf));
+    }
+
+    public void OnCallHeld(HoldState holdState)
+    {
+        setHoldState(holdState);
+        setCallState((holdState_ == HoldState.None) ? CallState.Connected : CallState.Held);            
+    }
+
+    public void OnCallSwitched()
+    {
+        NotifyPropertyChanged(nameof(IsSwitchedCall));
+        NotifyPropertyChanged(nameof(CanSwitchTo));
+    }
+
+    public void OnPlayerState(uint playerId, PlayerState state)
+    {
+        if (!playerIds_.Contains(playerId)) return;
+        
+        if((state == PlayerState.PlayerStopped) || (state == PlayerState.PlayerFailed))
+            playerIds_.Remove(playerId);
+
+        bool prevPlayingState = isFilePlaying_;
+        isFilePlaying_ = playerIds_.Count > 0;
+
+        if(prevPlayingState != isFilePlaying_)
+            NotifyPropertyChanged(nameof(IsFilePlaying));
+    }
+
+}//CallModel
+
+
+/////////////////////////////////////////////////////////////////
+/// CallsListModel
+
+public class CallsListModel(ObjModel parent_) : INotifyPropertyChanged
+{
+    public event PropertyChangedEventHandler? PropertyChanged;
+    readonly ObservableCollection<CallModel> collection_ = [];
+
+    CallModel? switchedCall_;
+    uint lastIncomingCallId_ = ErrorCode.kInvalidId;
+    bool confModeStarted_ = false;
+
+    public ObservableCollection<CallModel> Collection { get { return collection_; } }
+
+    private void NotifyPropertyChanged([CallerMemberName] string propertyName = "")
+    {
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+    }
+
+    public bool IsSwitchedCall(uint callId)
+    {
+        return switchedCall_ != null && (switchedCall_.ID == callId);
+    }
+
+    public uint LastIncomingCallId() { return lastIncomingCallId_; }
+
+    public CallModel? SwitchedCall
+    {
+        get { return switchedCall_; }
+        private set { switchedCall_ = value; NotifyPropertyChanged(); }
+    }
+
+    public bool ConfModeStarted
+    {
+        get { return confModeStarted_; }
+        private set { confModeStarted_ = value; NotifyPropertyChanged(); }
+    }
+
+    public void CalcDuration()
+    {
+        foreach(var c in collection_) c.CalcDuration();
+    }
+
+    public int Invite(DestData dest)
+    {
+        parent_.Logs?.Print($"Trying to invite {dest.ToExt} from account:{dest.FromAccId}");
+
+        int err = parent_.Core.Call_Invite(dest);
+        if (err != ErrorCode.kNoErr)
+        {
+            parent_.Logs?.Print($"Can't invite Err: {err} {parent_.ErrorText(err)}");
             return err;
         }
 
-        public int SwitchTo(uint callId)
-        {
-            parent_.Logs?.Print($"Switching mixer to callId:{callId}");
+        string accUri       = parent_.Accounts.GetUri(dest.FromAccId);
+        bool hasSecureMedia = parent_.Accounts.HasSecureMedia(dest.FromAccId);
 
+        CallModel newCall = new(dest.MyCallId, accUri, dest.ToExt, false, hasSecureMedia, dest.WithVideo, parent_);
+        collection_.Add(newCall);
+        parent_.Cdrs.Add(newCall);
+        
+        parent_.PostResolveContactName_(newCall);
+        return err;
+    }
+
+    public int SwitchTo(uint callId)
+    {
+        parent_.Logs?.Print($"Switching mixer to callId:{callId}");
+
+        int err = parent_.Core.Mixer_SwitchToCall(callId);
+        if (err == ErrorCode.kNoErr) ConfModeStarted = false;
+        else parent_.Logs?.Print($"Cant switch to callId:{callId} Err:{err} {parent_.ErrorText(err)}");
+        //Value '_switchedCallId' will set in the callback 'onSwitched'
+        return err;
+    }
+
+    public int MakeConference()
+    {
+        //TODO
+        if(confModeStarted_) {
+            uint callId = (switchedCall_!=null) ? switchedCall_.ID : 0;
+            parent_.Logs?.Print($"Ending conference, switch mixer to callId: {callId}");
             int err = parent_.Core.Mixer_SwitchToCall(callId);
-            if (err == Siprix.ErrorCode.kNoErr) ConfModeStarted = false;
-            else parent_.Logs?.Print($"Cant switch to callId:{callId} Err:{err} {parent_.ErrorText(err)}");
-            //Value '_switchedCallId' will set in the callback 'onSwitched'
+            ConfModeStarted = false;
             return err;
         }
+        else {
+            parent_.Logs?.Print("Joining all calls to conference");
+            int err = parent_.Core.Mixer_MakeConference();
+            if (err == ErrorCode.kNoErr) ConfModeStarted = true;
+            else parent_.Logs?.Print($"Cant make conference Err:{err} {parent_.ErrorText(err)}");
+            return err;
+        }
+    }
 
-        public int MakeConference()
+    public bool CanMakeConference { get { return ConfModeStarted || collection_.Count > 1; } }
+
+    public int SetPreviowVideoWindow(IntPtr hwnd)
+    {
+        parent_.Logs?.Print($"SetPreviowVideoWindow hwnd:{hwnd}");
+        return parent_.Core.Call_SetVideoWindow(ErrorCode.kInvalidId, hwnd);
+    }
+
+    bool hasConnectedFewCalls()
+    {
+        int counter = 0;
+        foreach(var m in collection_)
+            counter += m.IsConnected ? 1 : 0;
+
+        return counter > 1;
+    }
+
+    void setLastIncomingCallId(uint id) { lastIncomingCallId_ = id; NotifyPropertyChanged(nameof(LastIncomingCallId)); }
+
+
+    //Events raised by SDK
+    public void OnCallIncoming(uint callId, uint accId, bool withVideo, string hdrFrom, string hdrTo)
+    {
+        parent_.Logs?.Print($"onIncoming callId:{callId} accId:{accId} from:{hdrFrom} to:{hdrTo}");
+
+        var callModel = collection_.Where(a => a.ID == callId).FirstOrDefault();
+        if (callModel != null) return;//Call already exists, skip
+
+        string accUri       = parent_.Accounts.GetUri(accId);
+        bool hasSecureMedia = parent_.Accounts.HasSecureMedia(accId);
+
+        CallModel newCall = new(callId, accUri, parseExt(hdrFrom), isIncoming:true, hasSecureMedia, withVideo, parent_);
+        newCall.setDisplName(parseDisplayName(hdrFrom));
+        collection_.Add(newCall);
+
+        setLastIncomingCallId(callId);
+
+        SwitchedCall ??= newCall;//Set new value only when current one is null
+
+        parent_.Cdrs.Add(newCall);
+        //_postResolveContactName(newCall); //TODO add '_postResolveContactName'
+    }
+
+    public void OnCallConnected(uint callId, string hdrFrom, string hdrTo, bool withVideo)
+    {
+        //string nonce = parent_.Core.Call_GetNonce(callId);//Get nonce received from server during last auth
+        parent_.Logs?.Print($"onConnected callId:{callId} from:{hdrFrom} to:{hdrTo}");
+        parent_.Cdrs.SetConnected(callId, hdrFrom, hdrTo, withVideo);
+
+        var callModel = collection_.Where(a => a.ID == callId).FirstOrDefault();
+        callModel?.OnCallConnected(hdrFrom, hdrTo, withVideo);
+    }
+
+    public void OnCallTerminated(uint callId, uint statusCode)
+    {
+        parent_.Logs?.Print($"onTerminated callId:{callId} statusCode:{statusCode}");
+
+        var callModel = collection_.Where(a => a.ID == callId).FirstOrDefault();
+        if (callModel != null)
         {
-            //TODO
-            if(confModeStarted_) {
-                uint callId = (switchedCall_!=null) ? switchedCall_.ID : 0;
-                parent_.Logs?.Print($"Ending conference, switch mixer to callId: {callId}");
-                int err = parent_.Core.Mixer_SwitchToCall(callId);
+            parent_.Cdrs.SetTerminated(callId, statusCode, callModel.Duration);
+
+            collection_.Remove(callModel);
+
+            if (ConfModeStarted && !hasConnectedFewCalls())
                 ConfModeStarted = false;
-                return err;
-            }
-            else {
-                parent_.Logs?.Print("Joining all calls to conference");
-                int err = parent_.Core.Mixer_MakeConference();
-                if (err == Siprix.ErrorCode.kNoErr) ConfModeStarted = true;
-                else parent_.Logs?.Print($"Cant make conference Err:{err} {parent_.ErrorText(err)}");
-                return err;
-            }
         }
+    }
 
-        public int SetPreviowVideoWindow(IntPtr hwnd)
-        {
-            parent_.Logs?.Print($"SetPreviowVideoWindow hwnd:{hwnd}");
-            return parent_.Core.Call_SetVideoWindow(Siprix.CoreService.kInvalidId, hwnd);
-        }
-
-        bool hasConnectedFewCalls()
-        {
-            int counter = 0;
-            foreach(var m in collection_)
-                counter += m.IsConnected ? 1 : 0;
-
-            return counter > 1;
-        }
-
-        void setLastIncomingCallId(uint id) { lastIncomingCallId_ = id; NotifyPropertyChanged(nameof(LastIncomingCallId)); }
-
-
-        //Events raised by SDK
-        public void OnCallIncoming(uint callId, uint accId, bool withVideo, string hdrFrom, string hdrTo)
-        {
-            parent_.Logs?.Print($"onIncoming callId:{callId} accId:{accId} from:{hdrFrom} to:{hdrTo}");
-
-            var callModel = collection_.Where(a => a.ID == callId).FirstOrDefault();
-            if (callModel != null) return;//Call already exists, skip
-
-            string accUri       = parent_.Accounts.getUri(accId);
-            bool hasSecureMedia = parent_.Accounts.hasSecureMedia(accId);
-
-            CallModel newCall = new(callId, accUri, parseExt(hdrFrom), true, hasSecureMedia, withVideo, parent_);
-            newCall.setDisplName(parseDisplayName(hdrFrom));
-            collection_.Add(newCall);
-
-            setLastIncomingCallId(callId);
-
-            SwitchedCall ??= newCall;//Set new value only when current one is null
-
-            //_cdrs?.add(newCall);
-            //_postResolveContactName(newCall); //TODO add '_postResolveContactName'
-        }
-
-        public void OnCallConnected(uint callId, string hdrFrom, string hdrTo, bool withVideo)
-        {
-            //string nonce = parent_.Core.Call_GetNonce(callId);//Get nonce received from server during last auth
-            parent_.Logs?.Print($"onConnected callId:{callId} from:{hdrFrom} to:{hdrTo}");
-            //_cdrs?.setConnected(callId, hdrFrom, hdrTo);             
-
-            var callModel = collection_.Where(a => a.ID == callId).FirstOrDefault();
-            callModel?.OnCallConnected(hdrFrom, hdrTo, withVideo);
-        }
-
-        public void OnCallTerminated(uint callId, uint statusCode)
-        {
-            parent_.Logs?.Print($"onTerminated callId:{callId} statusCode:{statusCode}");
-
-            var callModel = collection_.Where(a => a.ID == callId).FirstOrDefault();
-            //_cdrs?.setTerminated(callId, statusCode, callModel?.displName);
-
-            if (callModel != null)
-            {
-                collection_.Remove(callModel);
-
-                if (ConfModeStarted && !hasConnectedFewCalls())
-                    ConfModeStarted = false;
-            }
-        }
-
-        public void OnCallProceeding(uint callId, string response)
-        {
-            parent_.Logs?.Print($"onProceeding callId:{callId} response:{response}");
-            var callModel = collection_.Where(a => a.ID == callId).FirstOrDefault();
-            callModel?.OnCallProceeding(response);
-        }
-
-        public void OnCallTransferred(uint callId, uint statusCode)
-        {
-            parent_.Logs?.Print($"onTransferred callId:{callId} statusCode:{statusCode}");
-            var callModel = collection_.Where(a => a.ID == callId).FirstOrDefault();
-            callModel?.OnCallTransferred(statusCode);
-        }
-
-        public void OnCallRedirected(uint origCallId, uint relatedCallId, string referTo)
-        {
-           parent_.Logs?.Print($"onRedirected origCallId:{origCallId} relatedCallId:{relatedCallId} to:{referTo}");
-
-           //Find 'origCallId'
-           var origCall = collection_.Where(a => a.ID == origCallId).FirstOrDefault();
-           if (origCall == null) return;
-
-           //Clone 'origCallId' and add to collection of calls as related one           
-           CallModel relatedCall = new(relatedCallId, origCall.AccUri, parseExt(referTo), false, 
-                                       origCall.HasSecureMedia, origCall.WithVideo, 
-                                       parent_);
-           collection_.Add(relatedCall);
-        }
-
-        public void OnCallDtmfReceived(uint callId, ushort tone)
-        {
-            parent_.Logs?.Print($"onDtmfReceived callId:{callId} tone:{tone}");
-
-            var callModel = collection_.Where(a => a.ID == callId).FirstOrDefault();
-            callModel?.OnCallDtmfReceived(tone);
-        }
-
-        public void OnCallHeld(uint callId, HoldState state)
-        {
-            parent_.Logs?.Print($"onHeld callId:{callId} {state}");
-
-            var callModel = collection_.Where(a => a.ID == callId).FirstOrDefault();
-            callModel?.OnCallHeld(state);
-        }
-
-        public void OnCallSwitched(uint callId)
-        {
-            parent_.Logs?.Print($"onSwitched callId:{callId}");
-
-            var callModel = collection_.Where(a => a.ID == callId).FirstOrDefault();            
-            SwitchedCall = callModel;
-
-            foreach (var c in collection_) c.OnCallSwitched();
-        }
-
-        public void OnPlayerState(uint playerId, PlayerState state)
-        {
-            parent_.Logs?.Print($"onPlayerState playerId:{playerId} state:{state}");
-
-            foreach (var c in collection_) c.OnPlayerState(playerId, state);
-        }
-
-        public static String parseExt(String uri)
-        {
-            //URI format: "displName" <sip:EXT@domain:port>
-            int startIndex = uri.IndexOf(':');
-            if (startIndex == -1) return "";
-
-            int endIndex = uri.IndexOf('@', startIndex + 1);
-            return (endIndex == -1) ? "" : uri.Substring(startIndex + 1, endIndex - startIndex - 1);
-        }
-
-        static String parseDisplayName(String uri)
-        {
-            //URI format: "DisplName" <sip:ext@domain:port>
-            int startIndex = uri.IndexOf('"');
-            if (startIndex == -1) return "";
-
-            int endIndex = uri.IndexOf('"', startIndex + 1);
-            return (endIndex == -1) ? "" : uri.Substring(startIndex + 1, endIndex - startIndex - 1);
-        }
-
-    }//CallsListModel
-
-    public enum BLFState { Trying, Proceeding, Early, Terminated, Confirmed, Unknown, SubscriptionDestroyed };
-
-    /////////////////////////////////////////////////////////////////
-    /// SubscriptionModel
-
-    public class SubscriptionModel : INotifyPropertyChanged
+    public void OnCallProceeding(uint callId, string response)
     {
-        public event PropertyChangedEventHandler? PropertyChanged;
-        SubscriptionState internalState_ = SubscriptionState.Created;
-        readonly Siprix.SubscrData subData_ = new();
+        parent_.Logs?.Print($"onProceeding callId:{callId} response:{response}");
+        var callModel = collection_.Where(a => a.ID == callId).FirstOrDefault();
+        callModel?.OnCallProceeding(response);
+    }
 
-        public static SubscriptionModel BLF()
-        {
-            SubscriptionModel blfModel = new();
-            blfModel.subData_.MimeSubType = "dialog-info+xml";
-            blfModel.subData_.EventType = "dialog";
-            return blfModel;
-        }
-
-        public Siprix.SubscrData Data { get { return subData_; } }
-        public uint ID { get { return subData_.MySubId; } }
-        public string ToExt { get { return subData_.ToExt; } set { subData_.ToExt = value; } }
-        public uint AccId { get { return subData_.FromAccId; } set { subData_.FromAccId = value; } }
-        public bool IsWaiting { get { return (internalState_ == SubscriptionState.Created); } }
-        public bool IsBlinking { get { return (BLFState == BLFState.Early); } }
-        public string AccUri { get; set; } = string.Empty;
-        public string Label { get; set; } = string.Empty;
-        public BLFState BLFState { get; private set; } = BLFState.Unknown;        
-
-        private void NotifyPropertyChanged([CallerMemberName] string propertyName = "")
-        {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-        }
-
-        public bool Equals(SubscriptionModel? other) { return (this.ID == other?.ID); }
-
-        //Event raised by SDK
-        public void OnSubscriptionState(SubscriptionState state, string resp)
-        {
-            internalState_ = state;
-
-            //Parse 'response' (contains XML body received in NOTIFY request)
-            // and use parsed attributes for UI rendering
-            int startIndex = resp.IndexOf("<state");
-            if (startIndex != -1)
-            {
-                startIndex = resp.IndexOf('>', startIndex);
-                int endIndex = resp.IndexOf("</state>", startIndex);
-                string blfStateStr = resp.Substring(startIndex + 1, endIndex- startIndex-1);
-                BLFState = blfStateStr switch
-                {
-                    "trying" => BLFState.Trying,
-                    "proceeding" => BLFState.Proceeding,
-                    "early" => BLFState.Early,
-                    "terminated" => BLFState.Terminated,
-                    "confirmed" => BLFState.Confirmed,
-                    _ => BLFState.Unknown,
-                };
-            }
-
-            if (state == SubscriptionState.Destroyed)
-                BLFState = BLFState.SubscriptionDestroyed;
-
-            NotifyPropertyChanged(nameof(BLFState));
-            NotifyPropertyChanged(nameof(IsWaiting));
-            NotifyPropertyChanged(nameof(IsBlinking));
-        }
-
-        public JsonDict storeToJson()
-        {
-            JsonDict dict = new();
-            dict.Add("ToExt",       subData_.ToExt);
-            dict.Add("MimeSubType", subData_.MimeSubType);
-            dict.Add("EventType",   subData_.EventType);            
-            dict.Add("AccUri",      AccUri);
-            dict.Add("Label",       Label);
-
-            if (subData_.ExpireTime != null) dict.Add("ExpireTime", subData_.ExpireTime);
-            return dict;
-
-        }//storeToJson
-
-        public static Siprix.SubscriptionModel loadFromJson(JsonElement elem)
-        {
-            SubscriptionModel m = new();
-
-            foreach (JsonProperty prop in elem.EnumerateObject())
-            {
-                bool isString = (prop.Value.ValueKind == JsonValueKind.String);
-                string strVal = isString ? prop.Value.GetString()! : "";
-
-                switch (prop.Name)
-                {
-                    case "ToExt":       m.subData_.ToExt       = strVal; break;
-                    case "MimeSubType": m.subData_.MimeSubType = strVal; break;                    
-                    case "EventType":   m.subData_.EventType   = strVal; break;
-                    case "ExpireTime":  m.subData_.ExpireTime  = prop.Value.GetUInt32(); break;
-                    case "Label":       m.Label  = strVal; break;
-                    case "AccUri":      m.AccUri = strVal; break;
-                }//switch
-            }//for
-
-            return m;
-
-        }//loadFromJson
-
-    }//SubscriptionModel
-
-
-    /////////////////////////////////////////////////////////////////
-    /// SubscriptionsListModel
-    public class SubscriptionsListModel(ObjModel parent)
+    public void OnCallTransferred(uint callId, uint statusCode)
     {
-        readonly ObservableCollection<SubscriptionModel> collection_ = [];
-        readonly ObjModel parent_ = parent;
+        parent_.Logs?.Print($"onTransferred callId:{callId} statusCode:{statusCode}");
+        var callModel = collection_.Where(a => a.ID == callId).FirstOrDefault();
+        callModel?.OnCallTransferred(statusCode);
+    }
 
-        public ObservableCollection<SubscriptionModel> Collection { get { return collection_; } }
+    public void OnCallRedirected(uint origCallId, uint relatedCallId, string referTo)
+    {
+       parent_.Logs?.Print($"onRedirected origCallId:{origCallId} relatedCallId:{relatedCallId} to:{referTo}");
 
-        public int Add(SubscriptionModel subscr, bool saveChanges = true)
+       //Find 'origCallId'
+       var origCall = collection_.Where(a => a.ID == origCallId).FirstOrDefault();
+       if (origCall == null) return;
+
+       //Clone 'origCallId' and add to collection of calls as related one           
+       CallModel relatedCall = new(relatedCallId, origCall.AccUri, parseExt(referTo), isIncoming:false, 
+                                   origCall.HasSecureMedia, origCall.WithVideo, parent_);
+       collection_.Add(relatedCall);
+    }
+
+    public void OnCallDtmfReceived(uint callId, ushort tone)
+    {
+        parent_.Logs?.Print($"onDtmfReceived callId:{callId} tone:{tone}");
+
+        var callModel = collection_.Where(a => a.ID == callId).FirstOrDefault();
+        callModel?.OnCallDtmfReceived(tone);
+    }
+
+    public void OnCallHeld(uint callId, HoldState state)
+    {
+        parent_.Logs?.Print($"onHeld callId:{callId} {state}");
+
+        var callModel = collection_.Where(a => a.ID == callId).FirstOrDefault();
+        callModel?.OnCallHeld(state);
+    }
+
+    public void OnCallSwitched(uint callId)
+    {
+        parent_.Logs?.Print($"onSwitched callId:{callId}");
+
+        var callModel = collection_.Where(a => a.ID == callId).FirstOrDefault();            
+        SwitchedCall = callModel;
+
+        foreach (var c in collection_) c.OnCallSwitched();
+    }
+
+    public void OnPlayerState(uint playerId, PlayerState state)
+    {
+        parent_.Logs?.Print($"onPlayerState playerId:{playerId} state:{state}");
+
+        foreach (var c in collection_) c.OnPlayerState(playerId, state);
+    }
+
+    public static string parseExt(string uri)
+    {
+        //URI format: "displName" <sip:EXT@domain:port>
+        int startIndex = uri.IndexOf(':');
+        if (startIndex == -1) return "";
+
+        int endIndex = uri.IndexOf('@', startIndex + 1);
+        return (endIndex == -1) ? "" : uri.Substring(startIndex + 1, endIndex - startIndex - 1);
+    }
+
+    static string parseDisplayName(string uri)
+    {
+        //URI format: "DisplName" <sip:ext@domain:port>
+        int startIndex = uri.IndexOf('"');
+        if (startIndex == -1) return "";
+
+        int endIndex = uri.IndexOf('"', startIndex + 1);
+        return (endIndex == -1) ? "" : uri.Substring(startIndex + 1, endIndex - startIndex - 1);
+    }
+
+}//CallsListModel
+
+public enum BLFState { Trying, Proceeding, Early, Terminated, Confirmed, Unknown, SubscriptionDestroyed };
+
+/////////////////////////////////////////////////////////////////
+/// SubscriptionModel
+
+public class SubscriptionModel : INotifyPropertyChanged
+{
+    public event PropertyChangedEventHandler? PropertyChanged;
+    SubscriptionState internalState_ = SubscriptionState.Created;
+    readonly SubscrData subData_ = new();
+
+    public static SubscriptionModel BLF()
+    {
+        SubscriptionModel blfModel = new();
+        blfModel.subData_.MimeSubType = "dialog-info+xml";
+        blfModel.subData_.EventType = "dialog";
+        return blfModel;
+    }
+
+    public SubscrData Data { get { return subData_; } }
+    public uint ID { get { return subData_.MySubId; } }
+    public string ToExt { get { return subData_.ToExt; } set { subData_.ToExt = value; } }
+    public uint AccId { get { return subData_.FromAccId; } set { subData_.FromAccId = value; } }
+    public bool IsWaiting { get { return (internalState_ == SubscriptionState.Created); } }
+    public bool IsBlinking { get { return (BLFState == BLFState.Early); } }
+    public string AccUri { get; set; } = string.Empty;
+    public string Label { get; set; } = string.Empty;
+    public BLFState BLFState { get; private set; } = BLFState.Unknown;        
+
+    private void NotifyPropertyChanged([CallerMemberName] string propertyName = "")
+    {
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+    }
+
+    public bool Equals(SubscriptionModel? other) { return (this.ID == other?.ID); }
+
+    //Event raised by SDK
+    public void OnSubscriptionState(SubscriptionState state, string resp)
+    {
+        internalState_ = state;
+
+        //Parse 'response' (contains XML body received in NOTIFY request)
+        // and use parsed attributes for UI rendering
+        int startIndex = resp.IndexOf("<state");
+        if (startIndex != -1)
         {
-            parent_.Logs?.Print($"Adding new subscription ext:{subscr.ToExt} accId:@{subscr.AccId}");
-
-            //When accUri present - model loaded from json, search accId as it might be changed
-            if (subscr.AccUri.Length != 0) { subscr.AccId  = parent_.Accounts.getAccId(subscr.AccUri); }
-            else                           { subscr.AccUri = parent_.Accounts.getUri(subscr.AccId); }
-
-            //Add
-            int err = parent_.Core.Subscription_Add(subscr.Data);
-            if (err != Siprix.ErrorCode.kNoErr)
+            startIndex = resp.IndexOf('>', startIndex);
+            int endIndex = resp.IndexOf("</state>", startIndex);
+            string blfStateStr = resp.Substring(startIndex + 1, endIndex- startIndex-1);
+            BLFState = blfStateStr switch
             {
-                parent_.Logs?.Print($"Can't add subscription Err: {err} {parent_.ErrorText(err)}");
-                return err;
-            }
+                "trying" => BLFState.Trying,
+                "proceeding" => BLFState.Proceeding,
+                "early" => BLFState.Early,
+                "terminated" => BLFState.Terminated,
+                "confirmed" => BLFState.Confirmed,
+                _ => BLFState.Unknown,
+            };
+        }
 
-            collection_.Add(subscr);
+        if (state == SubscriptionState.Destroyed)
+            BLFState = BLFState.SubscriptionDestroyed;
 
-            parent_.Logs?.Print($"Added successfully with id: {subscr.ID}");
-            if (saveChanges) parent_.postSaveSubscriptionChanges();
+        NotifyPropertyChanged(nameof(BLFState));
+        NotifyPropertyChanged(nameof(IsWaiting));
+        NotifyPropertyChanged(nameof(IsBlinking));
+    }
+
+    public JsonDict storeToJson()
+    {
+        JsonDict dict = new();
+        dict.Add("ToExt",       subData_.ToExt);
+        dict.Add("MimeSubType", subData_.MimeSubType);
+        dict.Add("EventType",   subData_.EventType);            
+        dict.Add("AccUri",      AccUri);
+        dict.Add("Label",       Label);
+
+        if (subData_.ExpireTime != null) dict.Add("ExpireTime", subData_.ExpireTime);
+        return dict;
+
+    }//storeToJson
+
+    internal static SubscriptionModel loadFromJson(JsonElement elem)
+    {
+        SubscriptionModel m = new();
+
+        foreach (JsonProperty prop in elem.EnumerateObject())
+        {
+            bool isString = (prop.Value.ValueKind == JsonValueKind.String);
+            string strVal = isString ? prop.Value.GetString()! : "";
+
+            switch (prop.Name)
+            {
+                case "ToExt":       m.subData_.ToExt       = strVal; break;
+                case "MimeSubType": m.subData_.MimeSubType = strVal; break;                    
+                case "EventType":   m.subData_.EventType   = strVal; break;
+                case "ExpireTime":  m.subData_.ExpireTime  = prop.Value.GetUInt32(); break;
+                case "Label":       m.Label  = strVal; break;
+                case "AccUri":      m.AccUri = strVal; break;
+            }//switch
+        }//for
+
+        return m;
+
+    }//loadFromJson
+
+}//SubscriptionModel
+
+
+/////////////////////////////////////////////////////////////////
+/// SubscriptionsListModel
+public class SubscriptionsListModel(ObjModel parent_)
+{
+    readonly ObservableCollection<SubscriptionModel> collection_ = [];
+
+    public ObservableCollection<SubscriptionModel> Collection { get { return collection_; } }
+
+    public int Add(SubscriptionModel subscr, bool saveChanges = true)
+    {
+        parent_.Logs?.Print($"Adding new subscription ext:{subscr.ToExt} accId:@{subscr.AccId}");
+
+        //When accUri present - model loaded from json, search accId as it might be changed
+        if (subscr.AccUri.Length != 0) { subscr.AccId  = parent_.Accounts.GetAccId(subscr.AccUri); }
+        else                           { subscr.AccUri = parent_.Accounts.GetUri(subscr.AccId); }
+
+        //Add
+        int err = parent_.Core.Subscription_Add(subscr.Data);
+        if (err != ErrorCode.kNoErr)
+        {
+            parent_.Logs?.Print($"Can't add subscription Err: {err} {parent_.ErrorText(err)}");
             return err;
         }
 
-        public int Delete(uint subId)
+        collection_.Add(subscr);
+
+        parent_.Logs?.Print($"Added successfully with id: {subscr.ID}");
+        if (saveChanges) parent_.PostSaveSubscriptionChanges();
+        return err;
+    }
+
+    public int Delete(SubscriptionModel sub)
+    {
+        int err = parent_.Core.Subscription_Delete(sub.ID);
+        if (err != ErrorCode.kNoErr)
         {
-            var subModel = collection_.Where(a => a.ID == subId).FirstOrDefault();
-            if (subModel == null) return -1;
-
-            int err = parent_.Core.Subscription_Delete(subId);
-            if (err != Siprix.ErrorCode.kNoErr)
-            {
-                parent_.Logs?.Print($"Can't delete subscription Err: {err} {parent_.ErrorText(err)}");
-                return err;
-            }
-
-            collection_.Remove(subModel);
-
-            parent_.postSaveSubscriptionChanges();
-
-            parent_.Logs?.Print($"Deleted subscription subId:{subId}");
+            parent_.Logs?.Print($"Can't delete subscription Err: {err} {parent_.ErrorText(err)}");
             return err;
         }
 
-        public void OnSubscriptionState(uint subId, SubscriptionState state, string response)
-        {
-            var subModel = collection_.Where(a => a.ID == subId).FirstOrDefault();
-            subModel?.OnSubscriptionState(state, response);
-            parent_.Logs?.Print($"OnSubscriptionState subId:{subId} state:{state} response:{response}");
-        }
+        collection_.Remove(sub);
 
-        public string storeToJson()
-        {
-            List<JsonDict> jsonList = [];
-            foreach (var subModel in collection_)
-            {
-                jsonList.Add(subModel.storeToJson());
-            }
-            return JsonSerializer.Serialize(jsonList);
-        }
-        public void loadFromJson(string jsonString)
-        {
-            if (jsonString.Length == 0) return;
+        parent_.PostSaveSubscriptionChanges();
 
+        parent_.Logs?.Print($"Deleted subscription subId:{sub.ID}");
+        return err;
+    }
+
+    public void OnSubscriptionState(uint subId, SubscriptionState state, string response)
+    {
+        var subModel = collection_.Where(a => a.ID == subId).FirstOrDefault();
+        subModel?.OnSubscriptionState(state, response);
+        parent_.Logs?.Print($"OnSubscriptionState subId:{subId} state:{state} response:{response}");
+    }
+
+    public void StoreToJson()
+    {
+        List<JsonDict> jsonList = [];
+        foreach (var subModel in collection_) jsonList.Add(subModel.storeToJson());
+
+        SampleWpf.Properties.Settings.Default.subscriptions = JsonSerializer.Serialize(jsonList);
+        SampleWpf.Properties.Settings.Default.Save();
+    }
+
+    public void LoadFromJson()
+    {
+        parent_.Logs?.Print("Loading subscriptions...");
+        string jsonString = SampleWpf.Properties.Settings.Default.subscriptions;
+
+        if (jsonString.Length != 0)
+        {
             collection_.Clear();
-
             using (JsonDocument document = JsonDocument.Parse(jsonString))
             {
                 foreach (JsonElement element in document.RootElement.EnumerateArray())
@@ -1145,573 +1153,693 @@ namespace Siprix
                 }
             }
         }
+        parent_.Logs?.Print($"Loaded {Collection.Count} subscription");
+    }
 
-    }//SubscriptionsListModel
+}//SubscriptionsListModel
 
-    /////////////////////////////////////////////////////////////////
-    /// MessageModel
-    public class MessageModel : INotifyPropertyChanged
+/////////////////////////////////////////////////////////////////
+/// MessageModel
+public class MessageModel : INotifyPropertyChanged
+{
+    public event PropertyChangedEventHandler? PropertyChanged;
+    readonly MsgData msgData_ = new();     
+
+    public MessageModel(MsgData data, string accUri, bool isIncoming = false, bool isWaiting=false)
     {
-        public event PropertyChangedEventHandler? PropertyChanged;
-        readonly Siprix.MsgData msgData_ = new();     
+        msgData_ = data;
+        AccUri = accUri;
+        IsIncoming = isIncoming;
+        IsWaiting = isWaiting;
+    }
 
-        public MessageModel(Siprix.MsgData data, string accUri, bool isIncoming = false, bool isWaiting=false)
-        {
-            msgData_ = data;
-            AccUri = accUri;
-            IsIncoming = isIncoming;
-            IsWaiting = isWaiting;
-        }
+    public uint ID { get { return msgData_.MyMsgId; } }
+    public bool IsIncoming { get; private set; }
+    public bool IsWaiting { get; private set; }
+    public bool SentSuccess { get; private set; }
+    public string ToExt { get { return msgData_.ToExt; }  }
+    public uint AccId { get { return msgData_.FromAccId; } set { msgData_.FromAccId = value; } }
+    public string AccUri { get; private set; } = string.Empty;
+    public string From { get { return IsIncoming ? msgData_.ToExt : AccUri; } }
+    public string To { get { return IsIncoming ? AccUri : msgData_.ToExt; } }
+    public string Body { get { return msgData_.Body; } }
 
-        public uint ID { get { return msgData_.MyMsgId; } }
-        public bool IsIncoming { get; private set; }
-        public bool IsWaiting { get; private set; }
-        public bool SentSuccess { get; private set; }
-        public string ToExt { get { return msgData_.ToExt; }  }
-        public uint AccId { get { return msgData_.FromAccId; } set { msgData_.FromAccId = value; } }
-        public string AccUri { get; private set; } = string.Empty;
-        public string From { get { return IsIncoming ? msgData_.ToExt : AccUri; } }
-        public string To { get { return IsIncoming ? AccUri : msgData_.ToExt; } }
-        public string Body { get { return msgData_.Body; } }
-
-        private void NotifyPropertyChanged([CallerMemberName] string propertyName = "")
-        {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-        }
-
-        public void OnMessageSentState(bool success, string response)
-        {
-            IsWaiting = false;
-            SentSuccess = success;
-            NotifyPropertyChanged(nameof(IsWaiting));
-            NotifyPropertyChanged(nameof(SentSuccess));
-        }
-
-        public JsonDict storeToJson()
-        {
-            JsonDict dict = new();
-            dict.Add("Body", msgData_.Body);
-            dict.Add("FromAccId", msgData_.FromAccId);
-            dict.Add("ToExt", msgData_.ToExt);
-            dict.Add("AccUri", AccUri);
-            dict.Add("IsIncoming", IsIncoming);
-            dict.Add("SentSuccess", SentSuccess);
-            return dict;
-
-        }//storeToJson
-
-        public static Siprix.MessageModel loadFromJson(JsonElement elem, uint internalMsgId)
-        {
-            MsgData msgData = new() { MyMsgId = internalMsgId };
-            MessageModel m = new(msgData, "");
-            
-            foreach (JsonProperty prop in elem.EnumerateObject())
-            {
-                bool isString = (prop.Value.ValueKind == JsonValueKind.String);
-                string strVal = isString ? prop.Value.GetString()! : "";
-            
-                switch (prop.Name)
-                {
-                    case "Body": m.msgData_.Body = strVal; break;
-                    case "FromAccId": m.msgData_.FromAccId = prop.Value.GetUInt32(); break;
-                    case "ToExt": m.msgData_.ToExt = strVal; break;
-                    case "AccUri": m.AccUri = strVal; break;
-                    case "IsIncoming": m.IsIncoming = prop.Value.GetBoolean(); break;
-                    case "SentSuccess": m.SentSuccess = prop.Value.GetBoolean(); break;
-                }//switch
-            }//for
-
-            return m;
-
-        }//loadFromJson
-
-    }//MessageModel
-
-    /////////////////////////////////////////////////////////////////
-    /// MessagesListModel
-    public class MessagesListModel(ObjModel parent)
+    private void NotifyPropertyChanged([CallerMemberName] string propertyName = "")
     {
-        readonly ObservableCollection<MessageModel> collection_ = [];
-        readonly ObjModel parent_ = parent;
-        readonly int kMaxItems = 25;
-        uint internalMsgId = 0;
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+    }
 
-        public ObservableCollection<MessageModel> Collection { get { return collection_; } }
+    public void OnMessageSentState(bool success, string response)
+    {
+        IsWaiting = false;
+        SentSuccess = success;
+        NotifyPropertyChanged(nameof(IsWaiting));
+        NotifyPropertyChanged(nameof(SentSuccess));
+    }
 
-        public int Send(Siprix.MsgData msg)
+    internal JsonDict storeToJson()
+    {
+        JsonDict dict = new();
+        dict.Add("Body", msgData_.Body);
+        dict.Add("FromAccId", msgData_.FromAccId);
+        dict.Add("ToExt", msgData_.ToExt);
+        dict.Add("AccUri", AccUri);
+        dict.Add("IsIncoming", IsIncoming);
+        dict.Add("SentSuccess", SentSuccess);
+        return dict;
+
+    }//storeToJson
+
+    internal static MessageModel loadFromJson(JsonElement elem, uint internalMsgId)
+    {
+        MsgData msgData = new() { MyMsgId = internalMsgId };
+        MessageModel m = new(msgData, "");
+        
+        foreach (JsonProperty prop in elem.EnumerateObject())
         {
-            parent_.Logs?.Print($"Sending new message to ext:{msg.ToExt} accId:@{msg.FromAccId}");
-
-            //Add
-            int err = parent_.Core.Message_Send(msg);
-            if (err != Siprix.ErrorCode.kNoErr)
+            bool isString = (prop.Value.ValueKind == JsonValueKind.String);
+            string strVal = isString ? prop.Value.GetString()! : "";
+        
+            switch (prop.Name)
             {
-                parent_.Logs?.Print($"Can't send message Err: {err} {parent_.ErrorText(err)}");
-                return err;
-            }
+                case "Body": m.msgData_.Body = strVal; break;
+                case "FromAccId": m.msgData_.FromAccId = prop.Value.GetUInt32(); break;
+                case "ToExt": m.msgData_.ToExt = strVal; break;
+                case "AccUri": m.AccUri = strVal; break;
+                case "IsIncoming": m.IsIncoming = prop.Value.GetBoolean(); break;
+                case "SentSuccess": m.SentSuccess = prop.Value.GetBoolean(); break;
+            }//switch
+        }//for
 
-            MessageModel msgModel = new(msg, parent_.Accounts.getUri(msg.FromAccId), isWaiting:true);
-            collection_.Add(msgModel);
+        return m;
+    }
 
-            parent_.Logs?.Print($"Posted successfully with id: {msg.MyMsgId}");
+}//MessageModel
 
-            if (collection_.Count > kMaxItems) collection_.RemoveAt(0);
-            parent_.postSaveMessagesChanges();
+/////////////////////////////////////////////////////////////////
+/// MessagesListModel
+public class MessagesListModel(ObjModel parent_)
+{
+    readonly ObservableCollection<MessageModel> collection_ = [];
+    readonly int kMaxItems = 25;
+    uint internalMsgId = 0;
+
+    public ObservableCollection<MessageModel> Collection { get { return collection_; } }
+
+    public int Send(MsgData msg)
+    {
+        parent_.Logs?.Print($"Sending new message to ext:{msg.ToExt} accId:@{msg.FromAccId}");
+
+        //Add
+        int err = parent_.Core.Message_Send(msg);
+        if (err != ErrorCode.kNoErr)
+        {
+            parent_.Logs?.Print($"Can't send message Err: {err} {parent_.ErrorText(err)}");
             return err;
         }
 
-        public int Delete(uint msgId)
+        MessageModel msgModel = new(msg, parent_.Accounts.GetUri(msg.FromAccId), isWaiting:true);
+        collection_.Add(msgModel);
+
+        parent_.Logs?.Print($"Posted successfully with id: {msg.MyMsgId}");
+
+        if (collection_.Count > kMaxItems) collection_.RemoveAt(0);
+        parent_.PostSaveMessagesChanges();
+        return err;
+    }
+
+    public int Delete(MessageModel msg)
+    {
+        if(!collection_.Remove(msg)) return -1;
+
+        parent_.PostSaveMessagesChanges();
+
+        parent_.Logs?.Print($"Deleted message msgId:{msg.ID}");
+        return ErrorCode.kNoErr;
+    }
+
+    public void OnMessageSentState(uint messageId, bool success, string response)
+    {
+        parent_.Logs?.Print($"OnMessageSentState msgId:{messageId} success:{success} response:{response}");
+        var msgModel = collection_.Where(a => a.ID == messageId).FirstOrDefault();
+        msgModel?.OnMessageSentState(success, response);
+
+        parent_.PostSaveMessagesChanges();
+    }
+    public void OnMessageIncoming(uint accId, string hdrFrom, string body)
+    {
+        parent_.Logs?.Print($"OnMessageIncoming accId:{accId} hdrFrom:{hdrFrom} body:'{body}'");
+
+        MsgData msg = new();
+        msg.Body = body;
+        msg.FromAccId = accId;            
+        msg.ToExt = CallsListModel.parseExt(hdrFrom);
+        msg.MyMsgId = getInternalMsgId();
+
+        MessageModel msgModel = new(msg, parent_.Accounts.GetUri(accId), isIncoming:true);
+        collection_.Add(msgModel);
+
+        if (collection_.Count > kMaxItems) collection_.RemoveAt(0);
+        parent_.PostSaveMessagesChanges();
+    }
+
+    private uint getInternalMsgId() { return --internalMsgId; }
+
+    public void StoreToJson()
+    {
+        List<JsonDict> jsonList = [];
+        foreach (var msgModel in collection_) jsonList.Add(msgModel.storeToJson());
+
+        SampleWpf.Properties.Settings.Default.messages = JsonSerializer.Serialize(jsonList);
+        SampleWpf.Properties.Settings.Default.Save();
+    }
+    public void LoadFromJson()
+    {
+        string jsonString = SampleWpf.Properties.Settings.Default.messages;
+        if (jsonString.Length != 0)
         {
-            var msgModel = collection_.Where(a => a.ID == msgId).FirstOrDefault();
-            if (msgModel == null) return -1;
-
-            collection_.Remove(msgModel);
-
-            parent_.postSaveMessagesChanges();
-
-            parent_.Logs?.Print($"Deleted message msgId:{msgId}");
-            return Siprix.ErrorCode.kNoErr;
-        }
-
-        public void OnMessageSentState(uint messageId, bool success, string response)
-        {
-            parent_.Logs?.Print($"OnMessageSentState msgId:{messageId} success:{success} response:{response}");
-            var msgModel = collection_.Where(a => a.ID == messageId).FirstOrDefault();
-            msgModel?.OnMessageSentState(success, response);
-
-            parent_.postSaveMessagesChanges();
-        }
-        public void OnMessageIncoming(uint accId, string hdrFrom, string body)
-        {
-            parent_.Logs?.Print($"OnMessageIncoming accId:{accId} hdrFrom:{hdrFrom} body:'{body}'");
-
-            Siprix.MsgData msg = new();
-            msg.Body = body;
-            msg.FromAccId = accId;            
-            msg.ToExt = CallsListModel.parseExt(hdrFrom);
-            msg.MyMsgId = getInternalMsgId();
-
-            MessageModel msgModel = new(msg, parent_.Accounts.getUri(accId), isIncoming:true);
-            collection_.Add(msgModel);
-
-            if (collection_.Count > kMaxItems) collection_.RemoveAt(0);
-            parent_.postSaveMessagesChanges();
-        }
-
-        private uint getInternalMsgId() { return --internalMsgId; }
-
-        public string storeToJson()
-        {
-            List<JsonDict> jsonList = [];
-            foreach (var msgModel in collection_)
-            {
-                jsonList.Add(msgModel.storeToJson());
-            }
-            return JsonSerializer.Serialize(jsonList);
-        }
-        public void loadFromJson(string jsonString)
-        {
-            if (jsonString.Length == 0) return;
-
             collection_.Clear();
-
             using (JsonDocument document = JsonDocument.Parse(jsonString))
             {
                 foreach (JsonElement element in document.RootElement.EnumerateArray())
                 {
                     MessageModel msgModel = MessageModel.loadFromJson(element, getInternalMsgId());
-                    msgModel.AccId = parent_.Accounts.getAccId(msgModel.AccUri);//get accountId by saved URI
+                    msgModel.AccId = parent_.Accounts.GetAccId(msgModel.AccUri);//get accountId by saved URI
                     collection_.Add(msgModel);
                 }
             }
+            parent_.Logs?.Print($"Loaded {Collection.Count} messages");
         }
+    }
 
-    }//MessagesListModel
+}//MessagesListModel
 
 
-    /////////////////////////////////////////////////////////////////
-    /// NetworkModel
+public enum CdrState { IncomingConnected, IncomingMissed, OutgoingConnected, OutgoingMissed };
 
-    public class NetworkModel(ObjModel parent) : INotifyPropertyChanged
+/////////////////////////////////////////////////////////////////
+/// CDR = CallDetailRecord model (contains attributes of recent call, serializes them to/from json)
+public class CdrModel : INotifyPropertyChanged
+{
+    public event PropertyChangedEventHandler? PropertyChanged;
+    public CdrModel() { }
+    public CdrModel(CallModel c)
     {
-        readonly ObjModel parent_ = parent;
-        public event PropertyChangedEventHandler? PropertyChanged;
+        ID = c.ID;
+        AccUri = c.AccUri;
+        RemoteExt = c.NameAndExt;
+        IsIncoming = c.IsIncoming;
+        WithVideo = c.WithVideo;
+    }
 
-        public bool NetworkLost { get; private set; }
+    public uint ID { get; private set; }/// Id if the CallModel, generated this record
+    public string RemoteExt { get; private set; } = "";     /// Phone number(extension) of remote side
+    public string AccUri { get; private set; } = "";/// Account URI
+    public string Duration { get; private set; } = "-";/// Duration of the call
+    public bool WithVideo { get; private set; } /// Has call video
+    public bool IsIncoming { get; private set; }/// Was call incoming
+    public bool IsConnected { get; private set; }/// Was call connected
+    public string DisplName { get; private set; } = "";
+    public uint StatusCode { get; private set; } /// Status code assigned when call ended
+    public DateTime MadeAt { get; private set; } = DateTime.Now; /// DateTime when call has been initiated/received
 
-        //Event raised by SDK
-        public void OnNetworkStateChanged(string name, NetworkState state)
-        {
-            parent_.Logs?.Print($"onNetworkStateChanged name:{name} {state}");
-            NetworkLost = (state == NetworkState.NetworkLost);
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(NetworkLost)));
-        }
+    public string MadeAtDate { get { return MadeAt.ToString("MMM dd, HH:mm tt"); } }  /// Formatted MadeAt
 
-    }//NetworkModel
-
-
-    /////////////////////////////////////////////////////////////////
-    /// LogsModel
-    public class LogsModel : INotifyPropertyChanged
+    public CdrState State
     {
-        string logText_ = "";        
-        public event PropertyChangedEventHandler? PropertyChanged;
-
-        public string LogText { get { return logText_; } }
-
-        public void Print(string text)
-        {
-            this.logText_ += DateTime.Now.ToString("HH:mm:ss ");
-            this.logText_ += text;            
-            this.logText_ += System.Environment.NewLine;
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(LogText)));
+        get {
+            if (IsIncoming) return IsConnected ? CdrState.IncomingConnected : CdrState.IncomingMissed;                                       
+            else            return IsConnected ? CdrState.OutgoingConnected : CdrState.OutgoingMissed;          
         }
+    }
+
+    internal JsonDict storeToJson()
+    {
+        JsonDict dict = new();
+        dict.Add("AccUri",     AccUri);
+        dict.Add("RemoteExt",  RemoteExt);
+        dict.Add("StatusCode", StatusCode);
+        dict.Add("IsIncoming", IsIncoming);
+        dict.Add("IsConnected",IsConnected);
+        dict.Add("Duration",   Duration);
+        dict.Add("MadeAt",     MadeAt.ToBinary());
+        dict.Add("WithVideo",  WithVideo);
+        return dict;
+    }
+
+    internal static CdrModel loadFromJson(JsonElement elem)
+    {
+        CdrModel c = new();
+
+        foreach (JsonProperty prop in elem.EnumerateObject())
+        {
+            bool isString = (prop.Value.ValueKind == JsonValueKind.String);
+            string strVal = isString ? prop.Value.GetString()! : "";
+
+            switch (prop.Name)
+            {
+                case "AccUri":      c.AccUri = strVal; break;
+                case "RemoteExt":   c.RemoteExt = strVal; break;
+                case "StatusCode":  c.StatusCode = prop.Value.GetUInt32(); break;
+                case "IsIncoming":  c.IsIncoming = prop.Value.GetBoolean(); break;
+                case "IsConnected": c.IsConnected = prop.Value.GetBoolean(); break;
+                case "Duration":    c.Duration = strVal; break;
+                case "MadeAt":      c.MadeAt = DateTime.FromBinary(prop.Value.GetInt64()); break;
+            }
+        }
+        return c;
+    }
+    private void NotifyPropertyChanged([CallerMemberName] string propertyName = "")
+    {
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+    }
+
+    public void SetConnected(bool withVideo)
+    {
+        WithVideo = withVideo;
+        IsConnected = true;
+        NotifyPropertyChanged(nameof(WithVideo));
+        NotifyPropertyChanged(nameof(IsConnected));
+    }
+
+    public void SetTerminated(uint statusCode, string duration)
+    {
+        //DisplName = displName;
+        StatusCode = statusCode;
+        Duration = duration;
+        //NotifyPropertyChanged(nameof(DisplName));
+        NotifyPropertyChanged(nameof(StatusCode));
+        NotifyPropertyChanged(nameof(Duration));
+    }
+
+}//CdrModel
+
+/////////////////////////////////////////////////////////////////
+/// CDRs list model (contains list of recent calls, methods for managing them)
+public class CdrsListModel(ObjModel parent_, int maxItems = 10)
+{
+    readonly ObservableCollection<CdrModel> collection_ = [];
+    readonly int kMaxItems = maxItems;
+
+    public ObservableCollection<CdrModel> Collection { get { return collection_; } }
+
+    /// Add new recent call item based on specified CallModel
+    public void Add(CallModel c)
+    {
+        CdrModel cdr = new(c);
+        collection_.Insert(0, cdr);
+
+        if ((kMaxItems > 0) && (collection_.Count > kMaxItems))
+        {
+            collection_.RemoveAt(collection_.Count-1);
+        }
+    }
+
+    /// Set 'connected' and other attributes of the recent call item specified by callId
+    public void SetConnected(uint callId, string from, string to, bool withVideo)
+    {
+        CdrModel? cdr = collection_.Where((c) => c.ID == callId).FirstOrDefault();
+        cdr?.SetConnected(withVideo);
+    }
+
+    /// Set 'terminated' and other attributes of the recent call item specified by callId
+    public void SetTerminated(uint callId, uint statusCode, string duration)
+    {
+        CdrModel? cdr = collection_.Where((c) => c.ID == callId).FirstOrDefault();
+        cdr?.SetTerminated(statusCode, duration);
+        parent_.PostSaveCdrChanges();
+    }
+
+    
+
+    /// Remote recent call item by its index in the list
+    public void Delete(CdrModel item)
+    {
+        if (collection_.Remove(item))
+            parent_.PostSaveCdrChanges();
+    }
+
+    public void LoadFromJson()
+    {
+        parent_.Logs?.Print("Loading cdrs...");
+        string jsonString = SampleWpf.Properties.Settings.Default.cdrs;
+
+        if (jsonString.Length!=0)
+        {
+            collection_.Clear();
+            using (JsonDocument document = JsonDocument.Parse(jsonString))
+            {
+                foreach (JsonElement element in document.RootElement.EnumerateArray())
+                {
+                    collection_.Add(CdrModel.loadFromJson(element));
+                }
+            }
+            parent_.Logs?.Print($"Loaded {Collection.Count} cdrs");
+        }
+    }
+
+    public void StoreToJson()
+    {
+        List<JsonDict> jsonList = [];
+        foreach (var cdrModel in collection_) jsonList.Add(cdrModel.storeToJson());
+
+        SampleWpf.Properties.Settings.Default.cdrs = JsonSerializer.Serialize(jsonList);
+        SampleWpf.Properties.Settings.Default.Save();
+    }
+
+}//CdrsModel
+
+
+/////////////////////////////////////////////////////////////////
+/// NetworkModel
+
+public class NetworkModel(ObjModel parent_) : INotifyPropertyChanged
+{
+    public event PropertyChangedEventHandler? PropertyChanged;
+
+    public bool NetworkLost { get; private set; }
+
+    //Event raised by SDK
+    public void OnNetworkStateChanged(string name, NetworkState state)
+    {
+        parent_.Logs?.Print($"onNetworkStateChanged name:{name} {state}");
+        NetworkLost = (state == NetworkState.NetworkLost);
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(NetworkLost)));
+    }
+
+}//NetworkModel
+
+
+/////////////////////////////////////////////////////////////////
+/// LogsModel
+public class LogsModel : INotifyPropertyChanged
+{
+    string logText_ = "";        
+    public event PropertyChangedEventHandler? PropertyChanged;
+
+    public string LogText { get { return logText_; } }
+
+    public void Print(string text)
+    {
+        this.logText_ += DateTime.Now.ToString("HH:mm:ss ");
+        this.logText_ += text;            
+        this.logText_ += System.Environment.NewLine;
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(LogText)));
+    }
+
+    public void OnTrialModeNotified()
+    {
+        Print("--- SIPRIX SDK is working in TRIAL mode ---");
+    }
+
+}//LogsModel
+
+
+/////////////////////////////////////////////////////////////////
+/// ObjModel
+
+public class ObjModel
+{
+    readonly AccountsListModel accountsListModel_;
+    readonly SubscriptionsListModel subscrListModel_;
+    readonly MessagesListModel messagesListModel_;
+    readonly CallsListModel callsListModel_;
+    readonly CdrsListModel cdrsListModel_;
+    readonly NetworkModel networkModel_;
+    readonly LogsModel? logsModel_;
+
+    readonly Siprix.CoreService core_;
+    private EventsHandler? eventHandler_;
+
+    public ObjModel()
+    {
+        //Create core service
+        core_ = new();
+
+        //Create models
+        logsModel_ = new LogsModel();
+        subscrListModel_ = new SubscriptionsListModel(this);
+        accountsListModel_ = new AccountsListModel(this);
+        messagesListModel_ = new MessagesListModel(this);
+        callsListModel_ = new CallsListModel(this);
+        cdrsListModel_ = new CdrsListModel(this);
+        networkModel_ = new NetworkModel(this);
+    }
+
+    public SubscriptionsListModel Subscriptions { get { return subscrListModel_; } }
+    public MessagesListModel Messages { get { return messagesListModel_; } }
+    public AccountsListModel Accounts { get { return accountsListModel_; } }
+    public CallsListModel Calls    { get { return callsListModel_; } } 
+    public CdrsListModel Cdrs { get { return cdrsListModel_; } }
+    public NetworkModel Networks { get { return networkModel_; } }
+    public LogsModel? Logs    { get { return logsModel_; } }
+    public Siprix.CoreService Core { get { return core_; } }
+    public string ErrorText(int err) { return core_.ErrorText(err);  }
+
+    public int Initialize(AppDispatcher dispatcher)
+    {
+        if (core_.IsInitialized())
+            return ErrorCode.kAlreadyInitialized;
+
+        eventHandler_ = new EventsHandler(this, dispatcher);
+
+        IniData iniData = new();
+        iniData.License = "...license-credentials...";
+        iniData.SingleCallMode = false;
+        iniData.LogLevelIde = LogLevel.Debug;
+        iniData.LogLevelFile = LogLevel.Debug;
+        iniData.WriteDmpUnhandledExc = true;
+
+        int err = core_.Initialize(eventHandler_, iniData);
+
+        if (err != Siprix.ErrorCode.kNoErr) {
+            Logs?.Print($"Can't initialize Siprix module Err: {err} {ErrorText(err)}");
+            return err;
+        }
+
+        Logs?.Print("Siprix module initialized successfully");
+        Logs?.Print($"Version: {core_.Version()}");
+
+        //Configure video
+        //VideoData vdoData = new();
+        //vdoData.noCameraImgPath = "noCamera.jpg";//path to image, which SDK will send to remote side instead of camera
+        //vdoData.bitrateKbps = 800;
+        //vdoData.width = 640;
+        //vdoData.height = 480;
+        //core_.Dvc_SetVideoParams(vdoData);
+
+        //Load saved models
+        accountsListModel_.LoadFromJson();
+        messagesListModel_.LoadFromJson();
+        subscrListModel_.LoadFromJson();
+        cdrsListModel_.LoadFromJson();
+        return err;
+    }
+
+    public void UnInitialize()
+    {
+        int err = core_.UnInitialize();
+        if (err == ErrorCode.kNoErr)
+            Logs?.Print("Siprix module uninitialized");
+        else
+            Logs?.Print($"Can't uninitialize Siprix module Err: {err} {ErrorText(err)}");
+    }
+
+    internal void PostSaveAccountsChanges()
+    {
+        eventHandler_?.dispatcher_?.BeginInvoke(new Action(() => { accountsListModel_.StoreToJson(); }));
+    }
+
+    internal void PostSaveSubscriptionChanges()
+    {
+        eventHandler_?.dispatcher_?.BeginInvoke(new Action(() => { subscrListModel_.StoreToJson(); }));
+    }
+
+    internal void PostSaveMessagesChanges()
+    {
+        eventHandler_?.dispatcher_?.BeginInvoke(new Action(() => { messagesListModel_.StoreToJson(); }));
+    }
+
+    internal void PostSaveCdrChanges() 
+    {
+        eventHandler_?.dispatcher_?.BeginInvoke(new Action(() => { cdrsListModel_.StoreToJson(); })); 
+    }
+
+    internal void PostResolveContactName_(CallModel newCall)
+    {
+        eventHandler_?.dispatcher_?.BeginInvoke(new Action(() => {
+            //string str = newCall.NameAndExt;
+            //TODO add 'ResolveContactName'
+            //newCall.setDisplName
+        }));
+    }
+
+
+    //Events raised by SDK
+    class EventsHandler(ObjModel parent_, AppDispatcher dispatcher) : Siprix.IEventDelegate
+    {
+        readonly public AppDispatcher dispatcher_ = dispatcher;
 
         public void OnTrialModeNotified()
         {
-            Print("--- SIPRIX SDK is working in TRIAL mode ---");
+            dispatcher_?.BeginInvoke(new Action(() => {
+                parent_.logsModel_?.OnTrialModeNotified();
+            }));
         }
 
-    }//LogsModel
+        public void OnDevicesAudioChanged()
+        {
+            //TODO add
+        }
+
+        public void OnAccountRegState(uint accId, RegState state, string response)
+        {
+            dispatcher_?.BeginInvoke(new Action(() => {
+                parent_.accountsListModel_.OnAccountRegState(accId, state, response);
+            }));
+        }
+
+        public void OnSubscriptionState(uint subId, SubscriptionState state, string response)
+        {
+            dispatcher_?.BeginInvoke(new Action(() => {
+                parent_.subscrListModel_.OnSubscriptionState(subId, state, response);
+            }));
+        }
+
+        public void OnNetworkState(string name, NetworkState state)
+        {
+            dispatcher_?.BeginInvoke(new Action(() => {
+                parent_.networkModel_.OnNetworkStateChanged(name, state);
+            }));
+        }
+
+        public void OnPlayerState(uint playerId, PlayerState state)
+        {
+            dispatcher_?.BeginInvoke(new Action(() => {
+                parent_.callsListModel_.OnPlayerState(playerId, state);
+            }));
+        }
+
+        public void OnRingerState(bool start)
+        {
+        }
+
+        public void OnCallIncoming(uint callId, uint accId, bool withVideo, string hdrFrom, string hdrTo)
+        {
+            dispatcher_?.BeginInvoke(new Action(() => {
+                parent_.callsListModel_.OnCallIncoming(callId, accId, withVideo, hdrFrom, hdrTo);
+            }));
+        }
+
+        public void OnCallConnected(uint callId, string hdrFrom, string hdrTo, bool withVideo)
+        {
+            dispatcher_?.BeginInvoke(new Action(() => {
+                parent_.callsListModel_.OnCallConnected(callId, hdrFrom, hdrTo, withVideo);
+            }));
+        }
+
+        public void OnCallTerminated(uint callId, uint statusCode)
+        {
+            dispatcher_?.BeginInvoke(new Action(() => {
+                parent_.callsListModel_.OnCallTerminated(callId, statusCode);
+            }));
+        }
+
+        public void OnCallProceeding(uint callId, string response)
+        {
+            dispatcher_?.BeginInvoke(new Action(() => {
+                parent_.callsListModel_.OnCallProceeding(callId, response);
+            }));
+        }
+
+        public void OnCallTransferred(uint callId, uint statusCode)
+        {
+            dispatcher_?.BeginInvoke(new Action(() =>{
+                parent_.callsListModel_.OnCallTransferred(callId, statusCode);
+            }));
+        }
+
+        public void OnCallRedirected(uint origCallId, uint relatedCallId, string referTo)
+        {
+            dispatcher_?.BeginInvoke(new Action(() => {
+                parent_.callsListModel_.OnCallRedirected(origCallId, relatedCallId, referTo);
+            }));
+        }
+
+        public void OnCallDtmfReceived(uint callId, ushort tone)
+        {
+            dispatcher_?.BeginInvoke(new Action(() => {
+                parent_.callsListModel_.OnCallDtmfReceived(callId, tone);
+            }));
+        }
+
+        public void OnCallHeld(uint callId, HoldState state)
+        {
+            dispatcher_?.BeginInvoke(new Action(() => {
+                parent_.callsListModel_.OnCallHeld(callId, state);
+            }));
+        }
+
+        public void OnCallSwitched(uint callId)
+        {
+            dispatcher_?.BeginInvoke(new Action(() => {
+                parent_.callsListModel_.OnCallSwitched(callId);
+            }));
+        }
+
+        public void OnMessageSentState(uint messageId, bool success, string response)
+        {
+            dispatcher_?.BeginInvoke(new Action(() => {
+                parent_.messagesListModel_.OnMessageSentState(messageId, success, response);
+            }));
+        }
+
+        public void OnMessageIncoming(uint accId, string hdrFrom, string body)
+        {
+            dispatcher_?.BeginInvoke(new Action(() => {
+                parent_.messagesListModel_.OnMessageIncoming(accId, hdrFrom, body);
+            }));
+        }
+    }
+
+}//ObjModel
 
 
+/// A command whose sole purpose is to relay its functionality to other
+/// objects by invoking delegates.
+public class RelayCommand(Action execute, Func<bool>? canExecute = null) : ICommand
+{   
+    readonly Func<bool>? canExecute_ = canExecute;
+    readonly Action execute_ = execute;
 
-    /////////////////////////////////////////////////////////////////
-    /// ObjModel
-
-    public class ObjModel
+    [DebuggerStepThrough]
+    public bool CanExecute(object? parameter)
     {
-        readonly AccountsListModel accountsListModel_;
-        readonly SubscriptionsListModel subscrListModel_;
-        readonly MessagesListModel messagesListModel_;
-        readonly CallsListModel callsListModel_;
-        readonly NetworkModel networkModel_;
-        readonly LogsModel? logsModel_;
+        return (canExecute_ == null) || canExecute_();
+    }
 
-        readonly Siprix.CoreService core_;
-
-        private SiprixEventsHandler? eventHandler_;
-
-        public ObjModel()
-        {
-            //Create core service
-            core_ = new();
-
-            //Create models
-            logsModel_ = new LogsModel();
-            subscrListModel_ = new SubscriptionsListModel(this);
-            accountsListModel_ = new AccountsListModel(this);
-            messagesListModel_ = new MessagesListModel(this);
-            callsListModel_ = new CallsListModel(this);
-            networkModel_ = new NetworkModel(this);
-        }
-
-        public SubscriptionsListModel Subscriptions { get { return subscrListModel_; } }
-        public MessagesListModel Messages { get { return messagesListModel_; } }
-        public AccountsListModel Accounts { get { return accountsListModel_; } }
-        public CallsListModel Calls    { get { return callsListModel_; } } 
-        public NetworkModel Networks { get { return networkModel_; } }
-        public LogsModel? Logs    { get { return logsModel_; } }
-        public Siprix.CoreService Core { get { return core_; } }
-        public string ErrorText(int err) { return core_.ErrorText(err);  }
-
-        public void Initialize(AppDispatcher dispatcher)
-        {
-            if (core_.IsInitialized())
-                return;
-
-            eventHandler_ = new SiprixEventsHandler(this, dispatcher);
-
-            Siprix.IniData iniData = new();
-            iniData.License = "...license-credentials...";
-            iniData.SingleCallMode = false;
-            iniData.LogLevelIde = Siprix.LogLevel.Debug;
-            iniData.LogLevelFile = Siprix.LogLevel.Debug;
-            iniData.WriteDmpUnhandledExc = true;
-    
-            int err = core_.Initialize(eventHandler_, iniData);
-
-            //Siprix.VideoData vdoData = new();
-            //vdoData.noCameraImgPath = "noCamera.jpg";//path to image, which SDK will send to remote side instead of camera
-            //vdoData.bitrateKbps = 800;
-            //vdoData.width = 640;
-            //vdoData.height = 480;
-            //core_.Dvc_SetVideoParams(vdoData);
-
-            if (err == Siprix.ErrorCode.kNoErr) {
-                Logs?.Print("Siprix module initialized successfully");
-                Logs?.Print($"Version: {core_.Version()}");
-
-                loadSavedAccounts();
-                loadSavedSubscriptions();
-                loadSavedMessages();
-            }
-            else{
-                Logs?.Print($"Can't initialize Siprix module Err: {err} {ErrorText(err)}");
-            }
-        }
-
-        public void UnInitialize()
-        {
-            int err = core_.UnInitialize();
-            if (err == Siprix.ErrorCode.kNoErr){
-                Logs?.Print("Siprix module uninitialized");
-            }
-            else{
-                Logs?.Print($"Can't uninitialize Siprix module Err: {err} {ErrorText(err)}");
-            }
-        }
-
-        internal void loadSavedAccounts()
-        {
-            try
-            {
-                Logs?.Print("Loading accounts...");
-            
-                accountsListModel_.loadFromJson(SampleWpf.Properties.Settings.Default.accounts);
-            
-                Logs?.Print($"Loaded {accountsListModel_.Collection.Count} accounts");
-            }
-            catch (Exception e) {
-                Logs?.Print(e.Message);
-            }
-        }
-
-        internal void loadSavedSubscriptions()
-        {
-            try
-            {
-                Logs?.Print("Loading subscriptions...");
-                subscrListModel_.loadFromJson(SampleWpf.Properties.Settings.Default.subscriptions);
-                Logs?.Print($"Loaded {subscrListModel_.Collection.Count} subscriptions");
-            }
-            catch (Exception e) {
-                Logs?.Print(e.Message);
-            }
-        }
-
-        internal void loadSavedMessages()
-        {
-            try
-            {
-                Logs?.Print("Loading messages...");
-                messagesListModel_.loadFromJson(SampleWpf.Properties.Settings.Default.messages);
-                Logs?.Print($"Loaded {subscrListModel_.Collection.Count} messages");
-            }
-            catch (Exception e) {
-                Logs?.Print(e.Message);
-            }
-        }
-
-
-        internal void postSaveAccountsChanges()
-        {
-            eventHandler_?.dispatcher_?.BeginInvoke(new Action(() => {
-                string jsonStr = accountsListModel_.storeToJson();
-            
-                SampleWpf.Properties.Settings.Default.accounts = jsonStr;
-                SampleWpf.Properties.Settings.Default.Save();
-            }));
-        }
-
-        internal void postSaveSubscriptionChanges()
-        {
-            eventHandler_?.dispatcher_?.BeginInvoke(new Action(() => {
-                string jsonStr = subscrListModel_.storeToJson();
-
-                SampleWpf.Properties.Settings.Default.subscriptions = jsonStr;
-                SampleWpf.Properties.Settings.Default.Save();
-            }));
-        }
-
-        internal void postSaveMessagesChanges()
-        {
-            eventHandler_?.dispatcher_?.BeginInvoke(new Action(() => {
-                string jsonStr = messagesListModel_.storeToJson();
-
-                SampleWpf.Properties.Settings.Default.messages = jsonStr;
-                SampleWpf.Properties.Settings.Default.Save();
-            }));
-        }
-
-        internal void postResolveContactName_(CallModel newCall)
-        {
-            eventHandler_?.dispatcher_?.BeginInvoke(new Action(() => {
-                //string str = newCall.NameAndExt;
-                //TODO add 'ResolveContactName'
-                //newCall.setDisplName
-            }));
-        }
-
-
-        //Events raised by SDK
-        class SiprixEventsHandler(ObjModel parent, AppDispatcher dispatcher) : Siprix.IEventDelegate
-        {
-            readonly public AppDispatcher dispatcher_ = dispatcher;
-            readonly ObjModel parent_ = parent;
-
-            public void OnTrialModeNotified()
-            {
-                dispatcher_?.BeginInvoke(new Action(() => {
-                    parent_.logsModel_?.OnTrialModeNotified();
-                }));
-            }
-
-            public void OnDevicesAudioChanged()
-            {
-                //TODO add
-            }
-
-            public void OnAccountRegState(uint accId, RegState state, string response)
-            {
-                dispatcher_?.BeginInvoke(new Action(() => {
-                    parent_.accountsListModel_.OnAccountRegState(accId, state, response);
-                }));
-            }
-
-            public void OnSubscriptionState(uint subId, SubscriptionState state, string response)
-            {
-                dispatcher_?.BeginInvoke(new Action(() => {
-                    parent_.subscrListModel_.OnSubscriptionState(subId, state, response);
-                }));
-            }
-
-            public void OnNetworkState(string name, NetworkState state)
-            {
-                dispatcher_?.BeginInvoke(new Action(() => {
-                    parent_.networkModel_.OnNetworkStateChanged(name, state);
-                }));
-            }
-
-            public void OnPlayerState(uint playerId, PlayerState state)
-            {
-                dispatcher_?.BeginInvoke(new Action(() => {
-                    parent_.callsListModel_.OnPlayerState(playerId, state);
-                }));
-            }
-
-            public void OnRingerState(bool start)
-            {
-            }
-
-            public void OnCallIncoming(uint callId, uint accId, bool withVideo, string hdrFrom, string hdrTo)
-            {
-                dispatcher_?.BeginInvoke(new Action(() => {
-                    parent_.callsListModel_.OnCallIncoming(callId, accId, withVideo, hdrFrom, hdrTo);
-                }));
-            }
-
-            public void OnCallConnected(uint callId, string hdrFrom, string hdrTo, bool withVideo)
-            {
-                dispatcher_?.BeginInvoke(new Action(() => {
-                    parent_.callsListModel_.OnCallConnected(callId, hdrFrom, hdrTo, withVideo);
-                }));
-            }
-
-            public void OnCallTerminated(uint callId, uint statusCode)
-            {
-                dispatcher_?.BeginInvoke(new Action(() => {
-                    parent_.callsListModel_.OnCallTerminated(callId, statusCode);
-                }));
-            }
-
-            public void OnCallProceeding(uint callId, string response)
-            {
-                dispatcher_?.BeginInvoke(new Action(() => {
-                    parent_.callsListModel_.OnCallProceeding(callId, response);
-                }));
-            }
-
-            public void OnCallTransferred(uint callId, uint statusCode)
-            {
-                dispatcher_?.BeginInvoke(new Action(() =>{
-                    parent_.callsListModel_.OnCallTransferred(callId, statusCode);
-                }));
-            }
-
-            public void OnCallRedirected(uint origCallId, uint relatedCallId, string referTo)
-            {
-                dispatcher_?.BeginInvoke(new Action(() => {
-                    parent_.callsListModel_.OnCallRedirected(origCallId, relatedCallId, referTo);
-                }));
-            }
-
-            public void OnCallDtmfReceived(uint callId, ushort tone)
-            {
-                dispatcher_?.BeginInvoke(new Action(() => {
-                    parent_.callsListModel_.OnCallDtmfReceived(callId, tone);
-                }));
-            }
-
-            public void OnCallHeld(uint callId, HoldState state)
-            {
-                dispatcher_?.BeginInvoke(new Action(() => {
-                    parent_.callsListModel_.OnCallHeld(callId, state);
-                }));
-            }
-
-            public void OnCallSwitched(uint callId)
-            {
-                dispatcher_?.BeginInvoke(new Action(() => {
-                    parent_.callsListModel_.OnCallSwitched(callId);
-                }));
-            }
-
-            public void OnMessageSentState(uint messageId, bool success, string response)
-            {
-                dispatcher_?.BeginInvoke(new Action(() => {
-                    parent_.messagesListModel_.OnMessageSentState(messageId, success, response);
-                }));
-            }
-
-            public void OnMessageIncoming(uint accId, string hdrFrom, string body)
-            {
-                dispatcher_?.BeginInvoke(new Action(() => {
-                    parent_.messagesListModel_.OnMessageIncoming(accId, hdrFrom, body);
-                }));
-            }
-        }
-
-    }//ObjModel
-
-
-    /// A command whose sole purpose is to relay its functionality to other
-    /// objects by invoking delegates.
-    public class RelayCommand(Action execute, Func<bool>? canExecute = null) : ICommand
-    {   
-        readonly Func<bool>? canExecute_ = canExecute;
-        readonly Action execute_ = execute;
-
-        [DebuggerStepThrough]
-        public bool CanExecute(object? parameter)
-        {
-            return (canExecute_ == null) || canExecute_();
-        }
-
-        public event EventHandler? CanExecuteChanged
-        {
+    public event EventHandler? CanExecuteChanged
+    {
 #if WPF_PROJECT
-            add{
-                if (canExecute_ != null)
-                    CommandManager.RequerySuggested += value;
-            }
-            remove { 
-                if (canExecute_ != null)
-                    CommandManager.RequerySuggested -= value;
-            }
+        add{
+            if (canExecute_ != null)
+                CommandManager.RequerySuggested += value;
+        }
+        remove { 
+            if (canExecute_ != null)
+                CommandManager.RequerySuggested -= value;
+        }
 #else
-            add{
-            }
-            remove{
-            }
+        add{
+        }
+        remove{
+        }
 #endif
-        }
+    }
 
-        public void Execute(object? parameter)
-        {
-            execute_();
-        }
+    public void Execute(object? parameter)
+    {
+        execute_();
+    }
 
-    }//RelayCommand
-
-}//namespace Siprix
+}//RelayCommand

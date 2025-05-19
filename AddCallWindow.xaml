@@ -6,12 +6,12 @@
         xmlns:local="clr-namespace:SampleWpf"
         mc:Ignorable="d"
         WindowStyle="ToolWindow"
-        Title="Add Call"  Height="Auto" Width="300"         
-        SizeToContent="WidthAndHeight"
+        Title="Add Call"  Height="Auto" Width="Auto"
+        
         WindowStartupLocation="CenterOwner" 
         ShowInTaskbar="False"
-        ResizeMode="NoResize">
-    <Grid>
+        >
+    <Grid x:Name="MainGrid" Margin="5"><!--
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="Auto" />            
             <ColumnDefinition Width="*" />
@@ -42,6 +42,6 @@
         <StackPanel Grid.Row="4" Grid.ColumnSpan="2" Orientation="Horizontal" HorizontalAlignment="Center" >
             <Button x:Name="btnOK" Content="OK"  Width="100" Margin="15" HorizontalAlignment="Right" Click="btnOK_Click"/>
             <Button x:Name="btnCancel" Content="Cancel" Width="100" Margin="15" HorizontalAlignment="Right" Click="btnCancel_Click"/>
-        </StackPanel>
+        </StackPanel> -->
     </Grid>
 </Window>

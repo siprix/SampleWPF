@@ -55,7 +55,7 @@ namespace Siprix
             if (err != Siprix.ErrorCode.kNoErr)
             {
                 Debug.WriteLine($"Can't add account Err: {err} {ErrorText(err)}");                
-                return Siprix.CoreService.kInvalidId;
+                return Siprix.ErrorCode.kInvalidId;
             }
             else
             {
@@ -102,7 +102,7 @@ namespace Siprix
             if (err != Siprix.ErrorCode.kNoErr)
             {
                 Debug.WriteLine($"Can't start call Err: {err} {ErrorText(err)}");
-                return Siprix.CoreService.kInvalidId;
+                return Siprix.ErrorCode.kInvalidId;
             }
 
             return dest.MyCallId;

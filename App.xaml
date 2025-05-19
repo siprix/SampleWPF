@@ -14,8 +14,11 @@
         <local:MuteTextConverter    x:Key="MuteTextConverter"/>
         
         <local:HoldStateIconConverter x:Key="HoldStateIconConverter"/>
-        <local:HoldStateTextConverter x:Key="HoldStateTextConverter"/>        
-        
+        <local:HoldStateTextConverter x:Key="HoldStateTextConverter"/>
+
+        <local:CdrStateIconConverter x:Key="CdrStateIconConverter"/>
+        <local:CdrStateColorConverter x:Key="CdrStateColorConverter"/>
+
         <local:CallDirectionIconConverter x:Key="CallDirectionIconConverter"/>
         <local:RegStateIconConverter x:Key="RegStateIconConverter"/>
         <local:RegStateColorConverter x:Key="RegStateColorConverter"/>
@@ -24,5 +27,11 @@
         <local:BLFStateColorConverter x:Key="BLFStateColorConverter"/>        
 
         <local:SwitchedCallColorConverter x:Key="SwitchedCallColorConverter"/>
+
+        <Style x:Key="listRowBorder" TargetType="ListBoxItem">
+            <Setter Property="BorderThickness" Value="0,0,0,1" />
+            <Setter Property="BorderBrush" Value="LightGray" />
+            <Setter Property="Margin" Value="1" />
+        </Style>
     </Application.Resources>
 </Application>

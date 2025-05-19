@@ -1,4 +1,5 @@
-﻿using System.Diagnostics;
+﻿using Siprix;
+using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -9,7 +10,8 @@ namespace SampleWpf;
 public partial class MainWindow : Window
 {
     Siprix.ObjModel objModel_ = null!;
-    CallControl switchedCallCtrl_ = null!;
+    CallSwitchedControl switchedCallCtrl_ = null!;
+    CallRecentListControl callRecentListCtrl_ = null!;
     public MainWindow()
     {
         InitializeComponent();
@@ -22,6 +24,7 @@ public partial class MainWindow : Window
 
         //Assign listener
         objModel_.Calls.PropertyChanged += OnCalls_PropertyChanged;
+        objModel_.Calls.Collection.CollectionChanged += CallsCollection_CollectionChanged;
 
         //Set data context
         lbSubscriptions.DataContext = objModel_.Subscriptions;
@@ -32,12 +35,14 @@ public partial class MainWindow : Window
         lbCalls.DataContext       = objModel_.Calls;
         tbLogs.DataContext        = objModel_.Logs;
 
-
-        switchedCallCtrl_ = new CallControl(objModel_);
+        switchedCallCtrl_ = new CallSwitchedControl(objModel_);
         CallsGrid.Children.Add(switchedCallCtrl_);
         Grid.SetRow(switchedCallCtrl_, 1);
-    }
 
+        callRecentListCtrl_ = new CallRecentListControl(objModel_);
+        CallsGrid.Children.Add(callRecentListCtrl_);
+        Grid.SetRowSpan(callRecentListCtrl_, 2);
+    }
 
     private void Window_Closed(object sender, EventArgs e)
     {
@@ -54,6 +59,12 @@ public partial class MainWindow : Window
                 mainTabCtrl.SelectedIndex = 1;
             }
         }
+    }
+
+    private void CallsCollection_CollectionChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
+    {
+        callRecentListCtrl_.Visibility = (objModel_.Calls.Collection.Count == 0) ? Visibility.Visible : Visibility.Collapsed;
+        switchedCallCtrl_.Visibility = (objModel_.Calls.Collection.Count == 0) ? Visibility.Collapsed : Visibility.Visible;
     }
 
     private void AccountAdd_Click(object sender, RoutedEventArgs e)
@@ -83,8 +94,8 @@ public partial class MainWindow : Window
     private void AccountDelete_Click(object sender, RoutedEventArgs e)
     {
         //Get selected
-        if ((sender is not MenuItem mnu) || (mnu.Tag == null)) return;
-        uint accID = (uint)mnu.Tag;
+        if(sender is not MenuItem mnu) return;
+        if (mnu?.DataContext is not Siprix.AccountModel acc) return;
 
         //Confirm deleting
         MessageBoxResult result = System.Windows.MessageBox.Show(this, "Confirm deleting account?", "Confirmation", 
@@ -92,7 +103,7 @@ public partial class MainWindow : Window
         if (result != MessageBoxResult.Yes) return;
 
         //Delete
-        int err = objModel_.Accounts.Delete(accID);
+        int err = objModel_.Accounts.Delete(acc);
         if (err != Siprix.ErrorCode.kNoErr)
         {
             System.Windows.MessageBox.Show(this, objModel_.ErrorText(err), "Information", 
@@ -103,8 +114,8 @@ public partial class MainWindow : Window
     private void SubscriptionDelete_Click(object sender, RoutedEventArgs e)
     {
         //Get selected
-        if ((sender is not MenuItem mnu) || (mnu.Tag == null)) return;
-        uint subscrID = (uint)mnu.Tag;
+        if(sender is not MenuItem mnu) return;
+        if (mnu?.DataContext is not Siprix.SubscriptionModel subscr) return;
 
         //Confirm deleting
         MessageBoxResult result = System.Windows.MessageBox.Show(this, "Confirm deleting subscription?", "Confirmation",
@@ -112,7 +123,7 @@ public partial class MainWindow : Window
         if (result != MessageBoxResult.Yes) return;
 
         //Delete
-        int err = objModel_.Subscriptions.Delete(subscrID);
+        int err = objModel_.Subscriptions.Delete(subscr);
         if (err != Siprix.ErrorCode.kNoErr)
         {
             System.Windows.MessageBox.Show(this, objModel_.ErrorText(err), "Information", 
@@ -140,8 +151,8 @@ public partial class MainWindow : Window
     private void MessageDelete_Click(object sender, RoutedEventArgs e)
     {
         //Get selected
-        if ((sender is not MenuItem mnu) || (mnu.Tag == null)) return;
-        uint msgID = (uint)mnu.Tag;
+        if (sender is not MenuItem mnu) return;        
+        if (mnu?.DataContext is not Siprix.MessageModel msg) return;
 
         //Confirm deleting
         MessageBoxResult result = System.Windows.MessageBox.Show(this, "Confirm deleting message?", "Confirmation",
@@ -149,14 +160,13 @@ public partial class MainWindow : Window
         if (result != MessageBoxResult.Yes) return;
 
         //Delete
-        int err = objModel_.Messages.Delete(msgID);
+        int err = objModel_.Messages.Delete(msg);
         if (err != Siprix.ErrorCode.kNoErr)
         {
             System.Windows.MessageBox.Show(this, objModel_.ErrorText(err), "Information",
                 MessageBoxButton.OK, MessageBoxImage.Information);
         }
     }
-
     
     private void ButtonMenu_Click(object sender, RoutedEventArgs e)
     {

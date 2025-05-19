@@ -8,7 +8,7 @@ using System.Windows.Interop;
 namespace SampleWpf;
 
 ///Provides controls for manipulating current/switched call    
-public partial class CallControl : System.Windows.Controls.UserControl
+public partial class CallSwitchedControl : System.Windows.Controls.UserControl
 {
     enum UiMode { eUndef, eMain, eDtmf, eTransferBlind, eTranferAtt };
 
@@ -22,7 +22,7 @@ public partial class CallControl : System.Windows.Controls.UserControl
 
     readonly VideoControlHost previewVideoHost_ = new();
 
-    public CallControl(Siprix.ObjModel objModel)
+    public CallSwitchedControl(Siprix.ObjModel objModel)
     {
         InitializeComponent();
         objModel_ = objModel;

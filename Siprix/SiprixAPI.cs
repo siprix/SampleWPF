@@ -308,8 +308,6 @@ namespace Siprix
         IntPtr modulePtr_;
         IEventDelegate? eventDelegate_;
         const string DllName = "siprix.dll";
-        
-        public const uint kInvalidId = 0;
 
         private readonly OnTrialModeNotified   onTrialModeNotified_;
         private readonly OnDevicesAudioChanged onDevicesAudioChanged_;

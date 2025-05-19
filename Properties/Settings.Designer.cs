@@ -58,5 +58,17 @@ namespace SampleWpf.Properties {
                 this["messages"] = value;
             }
         }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string cdrs {
+            get {
+                return ((string)(this["cdrs"]));
+            }
+            set {
+                this["cdrs"] = value;
+            }
+        }
     }
 }
