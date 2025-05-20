@@ -4,7 +4,6 @@ using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Interop;
 
-
 namespace SampleWpf;
 
 ///Provides controls for manipulating current/switched call    
@@ -21,6 +20,9 @@ public partial class CallSwitchedControl : System.Windows.Controls.UserControl
     readonly Border[] receivedVideoBorders_;
 
     readonly VideoControlHost previewVideoHost_ = new();
+
+    public delegate void AddCallHandler();
+    public event AddCallHandler? OnAddCall;
 
     public CallSwitchedControl(Siprix.ObjModel objModel)
     {
@@ -176,10 +178,8 @@ public partial class CallSwitchedControl : System.Windows.Controls.UserControl
 
     private void DtmfSend_Click(object sender, RoutedEventArgs e)
     {
-        System.Windows.Controls.Button btnSender = (System.Windows.Controls.Button)sender;
-        string tone = (string)btnSender.Tag;
-        tbSentDtmf.Text += tone;
-        callModel_?.SendDtmf(tone);
+        if(sender is System.Windows.Controls.Button btnSender)
+            tbSentDtmf.Text += (string)btnSender.Content;
     }
 
     private void TransferBlindMode_Click(object sender, RoutedEventArgs e)
@@ -277,8 +277,7 @@ public partial class CallSwitchedControl : System.Windows.Controls.UserControl
 
     private void AddCall_Click(object sender, RoutedEventArgs e)
     {
-        AddCallWindow wnd = new(objModel_);
-        wnd.ShowDialog();
+        OnAddCall?.Invoke();
     }
 }
 

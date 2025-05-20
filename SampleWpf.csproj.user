@@ -10,9 +10,6 @@
     <Compile Update="AddAccountWindow.xaml.cs">
       <SubType>Code</SubType>
     </Compile>
-    <Compile Update="AddCallWindow.xaml.cs">
-      <SubType>Code</SubType>
-    </Compile>
     <Compile Update="AddSubscriptionWindow.xaml.cs">
       <SubType>Code</SubType>
     </Compile>
@@ -25,9 +22,6 @@
   </ItemGroup>
   <ItemGroup>
     <Page Update="AddAccountWindow.xaml">
-      <SubType>Designer</SubType>
-    </Page>
-    <Page Update="AddCallWindow.xaml">
       <SubType>Designer</SubType>
     </Page>
     <Page Update="CallRecentListControl.xaml">

@@ -1,6 +1,8 @@
 ﻿using System.Windows.Controls;
 using System.Windows;
 using System.Windows.Controls.Primitives;
+using System.Windows.Media.Effects;
+using System.Windows.Media;
 
 namespace SampleWpf;
 
@@ -9,10 +11,12 @@ public partial class CallRecentListControl : UserControl
     readonly Siprix.ObjModel objModel_;
     readonly Siprix.DestData data_ = new();
 
-    public delegate void CancelClickHandler();
-    public event CancelClickHandler? CancelClick;
+    public delegate void CancelHandler();
+    public event CancelHandler? OnCancel;
 
-    public CallRecentListControl(Siprix.ObjModel om, bool modalMode = false)
+    DropShadowEffect? modalShadowEffect_;
+
+    public CallRecentListControl(Siprix.ObjModel om)
     {
         InitializeComponent();
         objModel_ = om;
@@ -25,7 +29,7 @@ public partial class CallRecentListControl : UserControl
         objModel_.Accounts.Collection.CollectionChanged += (_, _) => OnAccountsList_CollectionChanged();
         OnAccountsList_CollectionChanged();
 
-        btnCancel.Visibility = modalMode ? Visibility.Visible : Visibility.Collapsed;
+        btnCancel.Visibility = Visibility.Collapsed;
 
         txDestExt.TextChanged += (_,_) => DestExt_TextChanged();
         DestExt_TextChanged();
@@ -102,17 +106,57 @@ public partial class CallRecentListControl : UserControl
         }
 
         txDestExt.Text = "";
-        CancelClick?.Invoke();
+        OnCancel?.Invoke();
     }
 
     void Cancel_Click(object sender, EventArgs e)
     {
-        CancelClick?.Invoke();
+        OnCancel?.Invoke();
+    }
+
+    public void SetDialogMode(bool dialogMode)
+    {
+        btnCancel.Visibility = dialogMode ? Visibility.Visible : Visibility.Collapsed;
+        brdShadow.BorderThickness = new Thickness(dialogMode? 1: 0);
+        brdShadow.Margin = new Thickness(dialogMode ? 5 : 0);
+        brdShadow.Effect = dialogMode ? GetModalShadowEffect() : null;
     }
 
     private void DestExt_TextChanged()
     {
         btnVideoCall.IsEnabled = txDestExt.Text.Length!=0;
         btnAudioCall.IsEnabled = txDestExt.Text.Length != 0;
+    }
+
+    public void ShowDialpad_Click(object sender, EventArgs e)
+    {
+        gridDtmf.Visibility = (gridDtmf.Visibility == Visibility.Visible) ?
+                                Visibility.Collapsed : Visibility.Visible;
+    }
+
+    public void DtmfSend_Click(object sender, EventArgs e)
+    {
+        if (sender is System.Windows.Controls.Button btnSender)
+            txDestExt.Text += (string)btnSender.Content;
+    }
+
+    DropShadowEffect GetModalShadowEffect()
+    {
+        if (modalShadowEffect_ == null)
+        {
+            modalShadowEffect_ = new DropShadowEffect
+            {
+                Color = new Color { A = 255, R = 211, G = 211, B = 211 },
+                //Direction = 320,
+                //ShadowDepth = 0,
+                Opacity = 1
+            };
+        }
+        return modalShadowEffect_;
+    }
+
+    private void txDestExt_GotKeyboardFocus(object sender, System.Windows.Input.KeyboardFocusChangedEventArgs e)
+    {
+        gridDtmf.Visibility = Visibility.Collapsed;
     }
 }

@@ -42,11 +42,10 @@
         <PasswordBox x:Name="tbSipPassword" Grid.Row="2" Grid.Column="1" Margin="5" />
         <TextBox x:Name="tbSipPasswordReveal" Grid.Row="2" Grid.Column="1" Margin="5" Visibility="Hidden"/>
         <Button x:Name="showPassword" Grid.Row="2" Grid.Column="1" Click="ShowPassword_Click" Background="Transparent"
-                VerticalAlignment="Center" HorizontalAlignment="Right" Margin="0,0,5,0" BorderThickness="0">
-             <TextBlock Text="{x:Static local:Icons.visibility}" HorizontalAlignment="Center" 
-                FontFamily="{StaticResource MaterialIconsRegular}"  FontSize="16" />
-        </Button>
-
+                VerticalAlignment="Center" HorizontalAlignment="Right" Margin="0,0,5,0" BorderThickness="0"
+                Content="{x:Static local:Icons.visibility}" 
+                FontFamily="{StaticResource MaterialIconsRegular}" FontSize="16" />
+        
         <Separator Grid.Row="3" Grid.ColumnSpan="2" VerticalAlignment="Center" Margin="5,0"/>
 
         <TextBlock Text="Expire time (sec):" Grid.Row="4"  Margin="5" VerticalAlignment="Center"/>

@@ -24,7 +24,7 @@ public partial class MainWindow : Window
 
         //Assign listener
         objModel_.Calls.PropertyChanged += OnCalls_PropertyChanged;
-        objModel_.Calls.Collection.CollectionChanged += CallsCollection_CollectionChanged;
+        objModel_.Calls.Collection.CollectionChanged += (_,_) => OnCalls_CollectionChanged();
 
         //Set data context
         lbSubscriptions.DataContext = objModel_.Subscriptions;
@@ -36,12 +36,17 @@ public partial class MainWindow : Window
         tbLogs.DataContext        = objModel_.Logs;
 
         switchedCallCtrl_ = new CallSwitchedControl(objModel_);
+        switchedCallCtrl_.OnAddCall += CallAdd_Click;
         CallsGrid.Children.Add(switchedCallCtrl_);
         Grid.SetRow(switchedCallCtrl_, 1);
 
         callRecentListCtrl_ = new CallRecentListControl(objModel_);
+        callRecentListCtrl_.OnCancel += CallAddCancel_Click;
         CallsGrid.Children.Add(callRecentListCtrl_);
         Grid.SetRowSpan(callRecentListCtrl_, 2);
+        Panel.SetZIndex(callRecentListCtrl_, 2);
+
+        OnCalls_CollectionChanged();
     }
 
     private void Window_Closed(object sender, EventArgs e)
@@ -61,10 +66,23 @@ public partial class MainWindow : Window
         }
     }
 
-    private void CallsCollection_CollectionChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
+    private void OnCalls_CollectionChanged()
     {
-        callRecentListCtrl_.Visibility = (objModel_.Calls.Collection.Count == 0) ? Visibility.Visible : Visibility.Collapsed;
-        switchedCallCtrl_.Visibility = (objModel_.Calls.Collection.Count == 0) ? Visibility.Collapsed : Visibility.Visible;
+        bool callsListEmpty = (objModel_.Calls.Collection.Count == 0);
+        callRecentListCtrl_.Visibility = callsListEmpty ? Visibility.Visible : Visibility.Collapsed;
+        callRecentListCtrl_.SetDialogMode(!callsListEmpty);
+
+        switchedCallCtrl_.Visibility = callsListEmpty ? Visibility.Collapsed : Visibility.Visible;
+    }
+
+    private void CallAdd_Click()
+    {
+        callRecentListCtrl_.Visibility = Visibility.Visible;
+    }
+
+    private void CallAddCancel_Click()
+    {
+        callRecentListCtrl_.Visibility = Visibility.Collapsed;
     }
 
     private void AccountAdd_Click(object sender, RoutedEventArgs e)
@@ -167,7 +185,7 @@ public partial class MainWindow : Window
                 MessageBoxButton.OK, MessageBoxImage.Information);
         }
     }
-    
+
     private void ButtonMenu_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not System.Windows.Controls.Button btn) return;
