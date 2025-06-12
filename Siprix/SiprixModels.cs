@@ -38,13 +38,13 @@ public class AccountModel : INotifyPropertyChanged
         UnRegisterCommand = new RelayCommand(UnRegister, CanUnRegister);
     }
             
-    public AccData AccData      { get { return accData_; } }
-    public string Uri               { get { return accData_.SipExtension + "@" + accData_.SipServer; } }
-    public uint ID                  { get { return accData_.MyAccId; } }        
-    public bool IsWaiting           { get { return (RegState == RegState.InProgress); } }
-    public bool HasSecureMedia      { get { return (accData_.SecureMediaMode != null) && 
-                                                   (accData_.SecureMediaMode != SecureMedia.Disabled); } }
-    public string          RegText  { get; private set; }
+    public AccData AccData     { get { return accData_; } }
+    public string Uri          { get { return accData_.SipExtension + "@" + accData_.SipServer; } }
+    public uint ID             { get { return accData_.MyAccId; } }        
+    public bool IsWaiting      { get { return (RegState == RegState.InProgress); } }
+    public bool HasSecureMedia { get { return (accData_.SecureMediaMode != null) && 
+                                              (accData_.SecureMediaMode != SecureMedia.Disabled); } }
+    public string   RegText  { get; private set; }
     public RegState RegState { get; private set; }
             
     public ICommand RegisterCommand   { get; private set; }
@@ -103,7 +103,7 @@ public class AccountModel : INotifyPropertyChanged
     }
     
     //Event raised by SDK
-    public void OnAccountRegState(RegState state, string response)
+    internal void OnAccountRegState(RegState state, string response)
     {
         RegState = state;
         RegText  = response;
@@ -339,7 +339,7 @@ public class AccountsListModel(ObjModel parent_) : INotifyPropertyChanged
     }
 
     //Event raised by SDK
-    public void OnAccountRegState(uint accId, RegState state, string response)
+    internal void OnAccountRegState(uint accId, RegState state, string response)
     {
         var accModel = collection_.Where(a => a.ID == accId).FirstOrDefault();
         accModel?.OnAccountRegState(state, response);
@@ -662,25 +662,25 @@ public class CallModel : INotifyPropertyChanged
     }
 
     //Events raised by SDK
-    public void OnCallProceeding(string response)
+    internal void OnCallProceeding(string response)
     {
         //response_ = response;
         setCallState(CallState.Proceeding);
     }
 
-    public void OnCallConnected(string hdrFrom, string hdrTo, bool withVideo)
+    internal void OnCallConnected(string hdrFrom, string hdrTo, bool withVideo)
     {
         startTime_ = DateTime.Now;
         setWithVideo(withVideo);
         setCallState(CallState.Connected);
     }
 
-    public void OnCallTransferred(uint statusCode)
+    internal void OnCallTransferred(uint statusCode)
     {
         setCallState(CallState.Connected);
     }
 
-    public void OnCallDtmfReceived(ushort tone)
+    internal void OnCallDtmfReceived(ushort tone)
     {
         if(tone == 10) { receivedDtmf_ += '*'; }else
         if(tone == 11) { receivedDtmf_ += '#'; }
@@ -688,19 +688,19 @@ public class CallModel : INotifyPropertyChanged
         NotifyPropertyChanged(nameof(ReceivedDtmf));
     }
 
-    public void OnCallHeld(HoldState holdState)
+    internal void OnCallHeld(HoldState holdState)
     {
         setHoldState(holdState);
         setCallState((holdState_ == HoldState.None) ? CallState.Connected : CallState.Held);            
     }
 
-    public void OnCallSwitched()
+    internal void OnCallSwitched()
     {
         NotifyPropertyChanged(nameof(IsSwitchedCall));
         NotifyPropertyChanged(nameof(CanSwitchTo));
     }
 
-    public void OnPlayerState(uint playerId, PlayerState state)
+    internal void OnPlayerState(uint playerId, PlayerState state)
     {
         if (!playerIds_.Contains(playerId)) return;
         
@@ -735,6 +735,9 @@ public class CallsListModel(ObjModel parent_) : INotifyPropertyChanged
     {
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
     }
+
+    public delegate void CallTerminatedAppHandler(uint callId, uint statusCode);
+    public event CallTerminatedAppHandler? CallTerminated;
 
     public bool IsSwitchedCall(uint callId)
     {
@@ -778,7 +781,7 @@ public class CallsListModel(ObjModel parent_) : INotifyPropertyChanged
         collection_.Add(newCall);
         parent_.Cdrs.Add(newCall);
         
-        parent_.PostResolveContactName_(newCall);
+        parent_.PostResolveContactName(newCall);
         return err;
     }
 
@@ -833,7 +836,7 @@ public class CallsListModel(ObjModel parent_) : INotifyPropertyChanged
 
 
     //Events raised by SDK
-    public void OnCallIncoming(uint callId, uint accId, bool withVideo, string hdrFrom, string hdrTo)
+    internal void OnCallIncoming(uint callId, uint accId, bool withVideo, string hdrFrom, string hdrTo)
     {
         parent_.Logs?.Print($"onIncoming callId:{callId} accId:{accId} from:{hdrFrom} to:{hdrTo}");
 
@@ -855,7 +858,7 @@ public class CallsListModel(ObjModel parent_) : INotifyPropertyChanged
         //_postResolveContactName(newCall); //TODO add '_postResolveContactName'
     }
 
-    public void OnCallConnected(uint callId, string hdrFrom, string hdrTo, bool withVideo)
+    internal void OnCallConnected(uint callId, string hdrFrom, string hdrTo, bool withVideo)
     {
         //string nonce = parent_.Core.Call_GetNonce(callId);//Get nonce received from server during last auth
         parent_.Logs?.Print($"onConnected callId:{callId} from:{hdrFrom} to:{hdrTo}");
@@ -865,7 +868,7 @@ public class CallsListModel(ObjModel parent_) : INotifyPropertyChanged
         callModel?.OnCallConnected(hdrFrom, hdrTo, withVideo);
     }
 
-    public void OnCallTerminated(uint callId, uint statusCode)
+    internal void OnCallTerminated(uint callId, uint statusCode)
     {
         parent_.Logs?.Print($"onTerminated callId:{callId} statusCode:{statusCode}");
 
@@ -879,23 +882,27 @@ public class CallsListModel(ObjModel parent_) : INotifyPropertyChanged
             if (ConfModeStarted && !hasConnectedFewCalls())
                 ConfModeStarted = false;
         }
+        
+        parent_.PostAction(new Action(() => {
+            CallTerminated?.Invoke(callId, statusCode);
+        }));
     }
 
-    public void OnCallProceeding(uint callId, string response)
+    internal void OnCallProceeding(uint callId, string response)
     {
         parent_.Logs?.Print($"onProceeding callId:{callId} response:{response}");
         var callModel = collection_.Where(a => a.ID == callId).FirstOrDefault();
         callModel?.OnCallProceeding(response);
     }
 
-    public void OnCallTransferred(uint callId, uint statusCode)
+    internal void OnCallTransferred(uint callId, uint statusCode)
     {
         parent_.Logs?.Print($"onTransferred callId:{callId} statusCode:{statusCode}");
         var callModel = collection_.Where(a => a.ID == callId).FirstOrDefault();
         callModel?.OnCallTransferred(statusCode);
     }
 
-    public void OnCallRedirected(uint origCallId, uint relatedCallId, string referTo)
+    internal void OnCallRedirected(uint origCallId, uint relatedCallId, string referTo)
     {
        parent_.Logs?.Print($"onRedirected origCallId:{origCallId} relatedCallId:{relatedCallId} to:{referTo}");
 
@@ -909,7 +916,7 @@ public class CallsListModel(ObjModel parent_) : INotifyPropertyChanged
        collection_.Add(relatedCall);
     }
 
-    public void OnCallDtmfReceived(uint callId, ushort tone)
+    internal void OnCallDtmfReceived(uint callId, ushort tone)
     {
         parent_.Logs?.Print($"onDtmfReceived callId:{callId} tone:{tone}");
 
@@ -917,7 +924,7 @@ public class CallsListModel(ObjModel parent_) : INotifyPropertyChanged
         callModel?.OnCallDtmfReceived(tone);
     }
 
-    public void OnCallHeld(uint callId, HoldState state)
+    internal void OnCallHeld(uint callId, HoldState state)
     {
         parent_.Logs?.Print($"onHeld callId:{callId} {state}");
 
@@ -925,7 +932,7 @@ public class CallsListModel(ObjModel parent_) : INotifyPropertyChanged
         callModel?.OnCallHeld(state);
     }
 
-    public void OnCallSwitched(uint callId)
+    internal void OnCallSwitched(uint callId)
     {
         parent_.Logs?.Print($"onSwitched callId:{callId}");
 
@@ -935,7 +942,7 @@ public class CallsListModel(ObjModel parent_) : INotifyPropertyChanged
         foreach (var c in collection_) c.OnCallSwitched();
     }
 
-    public void OnPlayerState(uint playerId, PlayerState state)
+    internal void OnPlayerState(uint playerId, PlayerState state)
     {
         parent_.Logs?.Print($"onPlayerState playerId:{playerId} state:{state}");
 
@@ -1001,7 +1008,7 @@ public class SubscriptionModel : INotifyPropertyChanged
     public bool Equals(SubscriptionModel? other) { return (this.ID == other?.ID); }
 
     //Event raised by SDK
-    public void OnSubscriptionState(SubscriptionState state, string resp)
+    internal void OnSubscriptionState(SubscriptionState state, string resp)
     {
         internalState_ = state;
 
@@ -1121,7 +1128,7 @@ public class SubscriptionsListModel(ObjModel parent_)
         return err;
     }
 
-    public void OnSubscriptionState(uint subId, SubscriptionState state, string response)
+    internal void OnSubscriptionState(uint subId, SubscriptionState state, string response)
     {
         var subModel = collection_.Where(a => a.ID == subId).FirstOrDefault();
         subModel?.OnSubscriptionState(state, response);
@@ -1189,7 +1196,7 @@ public class MessageModel : INotifyPropertyChanged
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
     }
 
-    public void OnMessageSentState(bool success, string response)
+    internal void OnMessageSentState(bool success, string response)
     {
         IsWaiting = false;
         SentSuccess = success;
@@ -1278,7 +1285,7 @@ public class MessagesListModel(ObjModel parent_)
         return ErrorCode.kNoErr;
     }
 
-    public void OnMessageSentState(uint messageId, bool success, string response)
+    internal void OnMessageSentState(uint messageId, bool success, string response)
     {
         parent_.Logs?.Print($"OnMessageSentState msgId:{messageId} success:{success} response:{response}");
         var msgModel = collection_.Where(a => a.ID == messageId).FirstOrDefault();
@@ -1286,7 +1293,7 @@ public class MessagesListModel(ObjModel parent_)
 
         parent_.PostSaveMessagesChanges();
     }
-    public void OnMessageIncoming(uint accId, string hdrFrom, string body)
+    internal void OnMessageIncoming(uint accId, string hdrFrom, string body)
     {
         parent_.Logs?.Print($"OnMessageIncoming accId:{accId} hdrFrom:{hdrFrom} body:'{body}'");
 
@@ -1520,7 +1527,7 @@ public class NetworkModel(ObjModel parent_) : INotifyPropertyChanged
     public bool NetworkLost { get; private set; }
 
     //Event raised by SDK
-    public void OnNetworkStateChanged(string name, NetworkState state)
+    internal void OnNetworkStateChanged(string name, NetworkState state)
     {
         parent_.Logs?.Print($"onNetworkStateChanged name:{name} {state}");
         NetworkLost = (state == NetworkState.NetworkLost);
@@ -1547,7 +1554,7 @@ public class LogsModel : INotifyPropertyChanged
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(LogText)));
     }
 
-    public void OnTrialModeNotified()
+    internal void OnTrialModeNotified()
     {
         Print("--- SIPRIX SDK is working in TRIAL mode ---");
     }
@@ -1665,7 +1672,7 @@ public class ObjModel
         eventHandler_?.dispatcher_?.BeginInvoke(new Action(() => { cdrsListModel_.StoreToJson(); })); 
     }
 
-    internal void PostResolveContactName_(CallModel newCall)
+    internal void PostResolveContactName(CallModel newCall)
     {
         eventHandler_?.dispatcher_?.BeginInvoke(new Action(() => {
             //string str = newCall.NameAndExt;
@@ -1674,6 +1681,10 @@ public class ObjModel
         }));
     }
 
+    internal void PostAction(Action action)
+    {
+        eventHandler_?.dispatcher_?.BeginInvoke(action);
+    }
 
     //Events raised by SDK
     class EventsHandler(ObjModel parent_, AppDispatcher dispatcher) : Siprix.IEventDelegate

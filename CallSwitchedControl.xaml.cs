@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Interop;
+using System.Windows.Media;
 
 namespace SampleWpf;
 
@@ -33,6 +34,7 @@ public partial class CallSwitchedControl : System.Windows.Controls.UserControl
 
         calls_.Collection.CollectionChanged += onCalls_CollectionChanged;
         calls_.PropertyChanged += onCalls_PropertyChanged;
+        calls_.CallTerminated += onCalls_CallTerminated;
 
         callDurationTimer_.Tick += onCallDurationTimer_Tick;
         callDurationTimer_.Interval = TimeSpan.FromSeconds(1);
@@ -90,6 +92,19 @@ public partial class CallSwitchedControl : System.Windows.Controls.UserControl
         }
     }
 
+    private void onCalls_CallTerminated(uint callId, uint statusCode)
+    {
+        //if(statusCode==403)
+        //{
+        //    string pathToDemoFile = AppDomain.CurrentDomain.BaseDirectory + "Resources\\music.mp3";
+        //
+        //    var uri = new Uri(pathToDemoFile, UriKind.RelativeOrAbsolute);
+        //    var player = new MediaPlayer();
+        //    player.Open(uri);
+        //    player.Play();
+        //}
+    }
+
     private void onCall_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(Siprix.CallModel.CallState)||
@@ -138,7 +153,7 @@ public partial class CallSwitchedControl : System.Windows.Controls.UserControl
         bnDtmfMode.Visibility     = isConnected ? Visibility.Visible : Visibility.Collapsed;
 
         //Video
-        gridVideo.Visibility = isVideo ? Visibility.Visible : Visibility.Collapsed;            
+        gridVideo.Visibility = isVideo ? Visibility.Visible : Visibility.Collapsed;
 
         //Connected display depending on input mode
         UiMode uiMode = getUiMode(callModel_?.CallState);
@@ -147,7 +162,7 @@ public partial class CallSwitchedControl : System.Windows.Controls.UserControl
         gridMain.Visibility     = (uiMode == UiMode.eMain)          ? Visibility.Visible : Visibility.Collapsed;
         gridTransfer.Visibility = (uiMode == UiMode.eTransferBlind) ? Visibility.Visible : Visibility.Collapsed;
                     
-        bnMakeCall.Visibility = (callModel_ == null) ? Visibility.Visible : Visibility.Collapsed;
+        //bnMakeCall.Visibility = (callModel_ == null) ? Visibility.Visible : Visibility.Collapsed;
         bnHangup.Visibility   = (callModel_ == null)|| isRinging ? Visibility.Collapsed : Visibility.Visible;
 
         if (callModel_ != null)
@@ -171,7 +186,7 @@ public partial class CallSwitchedControl : System.Windows.Controls.UserControl
         {
             //Show DTMF keys
             tbSentDtmf.Text = "";
-            setUiMode(callModel_?.CallState, UiMode.eDtmf);                
+            setUiMode(callModel_?.CallState, UiMode.eDtmf);
         }
         updateVisibility();
     }
