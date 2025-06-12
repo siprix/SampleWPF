@@ -320,6 +320,7 @@ EXPORT ErrorCode Call_Bye(ISiprixModule* module, CallId callId);
 EXPORT ErrorCode Call_GetSipHeader(ISiprixModule* module, CallId callId, 
                                 const char* hdrName, char* hdrVal, uint32_t* hdrValLen);
 EXPORT ErrorCode Call_GetNonce(ISiprixModule* module, CallId callId, char* nonceVal, uint32_t* nonceValLen);
+EXPORT ErrorCode Call_StopRingtone(ISiprixModule* module);
 
 ////////////////////////////////////////////////////////////////////////////
 //Mixer

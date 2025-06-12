@@ -598,6 +598,11 @@ namespace Siprix
             return Call_Renegotiate(modulePtr_, callId);
         }
 
+        public int Call_StopRingtone()
+        {
+            return Call_StopRingtone(modulePtr_);
+        }
+
         /// [Mixer] ///////////////////////////////////////////////////////////////////////////////////////////////
         public int Mixer_SwitchToCall(CallId callId)
         {
@@ -947,6 +952,8 @@ namespace Siprix
         [DllImport(DllName)]
         private static extern int Call_Renegotiate(IntPtr module, CallId callId);
 
+        [DllImport(DllName)]
+        private static extern int Call_StopRingtone(IntPtr module);
 
         /// [Mixer] ///////////////////////////////////////////////////////////////////////////////////////////////
         [DllImport(DllName)]
