@@ -29,7 +29,7 @@
                     Command="{Binding MuteCamCommand}"
                     Visibility="{Binding CanMuteCam, Converter={StaticResource BoolToVis}}">
                 <StackPanel Orientation="Vertical" >
-                    <TextBlock Text="{Binding IsCamMuted, Converter={StaticResource CamMuteIconConverter}, Mode=OneWay}"                           
+                    <TextBlock Text="{Binding IsCamMuted, Converter={StaticResource CamMuteIconConverter}, Mode=OneWay}"
                         FontFamily="{StaticResource MaterialIconsRegular}"  FontSize="20" HorizontalAlignment="Center" />
                     <TextBlock Text="{Binding IsCamMuted, Converter={StaticResource MuteTextConverter}, Mode=OneWay}" />
                 </StackPanel>
@@ -71,7 +71,7 @@
         </StackPanel>
 
         <!-- 'Make outgoing call' button -->
-        <Button x:Name="bnMakeCall" Width="70" Height="45" Grid.Row="2" Click="AddCall_Click" VerticalAlignment="Center" d:Visibility="Hidden">
+        <Button x:Name="bnMakeCall" Width="70" Height="45" Grid.Row="2" Click="AddCall_Click" VerticalAlignment="Center" Visibility="Collapsed">
             <StackPanel Orientation="Vertical"  >
                 <TextBlock Text="{x:Static local:Icons.add_call}" HorizontalAlignment="Center"
                     FontFamily="{StaticResource MaterialIconsRegular}"  FontSize="20" />
