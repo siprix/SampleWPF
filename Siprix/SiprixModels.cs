@@ -1518,6 +1518,99 @@ public class CdrsListModel(ObjModel parent_, int maxItems = 10)
 
 
 /////////////////////////////////////////////////////////////////
+/// DevicesModel
+
+public class Device
+{
+    public Device(uint i, string n, string g) { Index = i;  Name = n; Guid = g; }
+    public uint Index { get; private set; } = 0;
+    public string Name { get; private set; } = "";
+    public string Guid { get; private set; } = "";
+}
+
+public class DevicesModel(ObjModel parent_) : INotifyPropertyChanged
+{
+    public event PropertyChangedEventHandler? PropertyChanged;
+
+    readonly ObservableCollection<Device> playback_ = [];
+    readonly ObservableCollection<Device> record_ = [];
+    readonly ObservableCollection<Device> video_ = [];
+    uint selPlaybackIndex_=0;
+    uint selRecordIndex_ = 0;
+    uint selVideoIndex_ = 0;
+    public ObservableCollection<Device> Playback { get { return playback_; } }
+    public ObservableCollection<Device> Record { get { return record_; } }
+    public ObservableCollection<Device> Video { get { return video_; } }
+
+    public uint SelectedPlayback { 
+        get { return selPlaybackIndex_; }
+        set { selPlaybackIndex_ = value; parent_.Core.Dvc_SetPlayoutDevice(value); }
+    }
+    public uint SelectedRecord {
+        get { return selRecordIndex_; }
+        set { selRecordIndex_ = value; parent_.Core.Dvc_SetRecordingDevice(value); } 
+    }
+    public uint SelectedVideo {
+        get { return selVideoIndex_; }
+        set { selVideoIndex_ = value; parent_.Core.Dvc_SetVideoDevice(value); }
+    }
+
+    public void Load()
+    {
+        LoadPlayback();
+        LoadRecord();
+        LoadVideo();
+    }
+
+    internal void LoadPlayback()
+    {
+        playback_.Clear();
+        string guid="";
+        uint playbackCount = parent_.Core.Dvc_GetPlayoutDevices();
+        for(uint i=0; i < playbackCount; ++i)
+        {
+            string name = parent_.Core.Dvc_GetPlayoutDevice(i, ref guid);
+            playback_.Add(new Device(i, name, guid));
+        }
+    }
+
+    internal void LoadRecord()
+    {
+        record_.Clear(); 
+        string guid = "";
+        uint recordCount = parent_.Core.Dvc_GetRecordingDevices();
+        for (uint i = 0; i < recordCount; ++i)
+        {
+            string name = parent_.Core.Dvc_GetRecordingDevice(i, ref guid);
+            record_.Add(new Device(i, name, guid));
+        }
+    }
+
+    internal void LoadVideo()
+    {
+        video_.Clear();
+        string guid = "";
+        uint videoCount = parent_.Core.Dvc_GetVideoDevices();
+        for (uint i = 0; i < videoCount; ++i)
+        {
+            string name = parent_.Core.Dvc_GetVideoDevice(i, ref guid);
+            video_.Add(new Device(i, name, guid));
+        }
+    }
+    //Event raised by SDK
+    internal void OnDevicesAudioChanged()
+    {
+        LoadPlayback();
+        LoadRecord();
+        parent_.Logs?.Print($"onDevicesAudioChanged");
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Playback)));
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Record)));
+    }
+
+}//DevicesModel
+
+
+/////////////////////////////////////////////////////////////////
 /// NetworkModel
 
 public class NetworkModel(ObjModel parent_) : INotifyPropertyChanged
@@ -1573,6 +1666,7 @@ public class ObjModel
     readonly CallsListModel callsListModel_;
     readonly CdrsListModel cdrsListModel_;
     readonly NetworkModel networkModel_;
+    readonly DevicesModel devicesModel_;
     readonly LogsModel? logsModel_;
 
     readonly Siprix.CoreService core_;
@@ -1591,6 +1685,7 @@ public class ObjModel
         callsListModel_ = new CallsListModel(this);
         cdrsListModel_ = new CdrsListModel(this);
         networkModel_ = new NetworkModel(this);
+        devicesModel_ = new DevicesModel(this);
     }
 
     public SubscriptionsListModel Subscriptions { get { return subscrListModel_; } }
@@ -1599,6 +1694,7 @@ public class ObjModel
     public CallsListModel Calls    { get { return callsListModel_; } } 
     public CdrsListModel Cdrs { get { return cdrsListModel_; } }
     public NetworkModel Networks { get { return networkModel_; } }
+    public DevicesModel Devices { get { return devicesModel_; } }
     public LogsModel? Logs    { get { return logsModel_; } }
     public Siprix.CoreService Core { get { return core_; } }
     public string ErrorText(int err) { return core_.ErrorText(err);  }
@@ -1700,7 +1796,9 @@ public class ObjModel
 
         public void OnDevicesAudioChanged()
         {
-            //TODO add
+            dispatcher_?.BeginInvoke(new Action(() => {
+                parent_.devicesModel_.OnDevicesAudioChanged();
+            }));
         }
 
         public void OnAccountRegState(uint accId, RegState state, string response)

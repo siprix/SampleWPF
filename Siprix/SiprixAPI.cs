@@ -638,6 +638,71 @@ namespace Siprix
             return Dvc_SetVideoParams(modulePtr_, getNative(vdoData));
         }
 
+        public uint Dvc_GetPlayoutDevices()
+        {
+            uint numberOfDevices=0;
+            int err = Dvc_GetPlayoutDevices(modulePtr_, ref numberOfDevices);
+            return (err==ErrorCode.kNoErr) ? numberOfDevices : 0;
+        }
+        
+        public uint Dvc_GetRecordingDevices()
+        {
+            uint numberOfDevices = 0;
+            int err = Dvc_GetRecordingDevices(modulePtr_, ref numberOfDevices);
+            return (err == ErrorCode.kNoErr) ? numberOfDevices : 0;
+        }
+        
+        public uint Dvc_GetVideoDevices()
+        {
+            uint numberOfDevices = 0;
+            int err = Dvc_GetVideoDevices(modulePtr_, ref numberOfDevices);
+            return (err == ErrorCode.kNoErr) ? numberOfDevices : 0;
+        }
+
+        public string Dvc_GetPlayoutDevice(uint index, ref string guid)
+        {
+            uint nameLen = 64, guidLen = 64;
+            var nameBuilder = new StringBuilder((int)(nameLen + 1));
+            var guidBuilder = new StringBuilder((int)(guidLen + 1));
+            Dvc_GetPlayoutDevice(modulePtr_, index, nameBuilder, nameLen, guidBuilder, guidLen);
+            guid = guidBuilder.ToString();
+            return nameBuilder.ToString();
+        }
+        
+        public string Dvc_GetRecordingDevice(uint index, ref string guid)
+        {
+            uint nameLen = 64, guidLen = 64;
+            var nameBuilder = new StringBuilder((int)(nameLen + 1));
+            var guidBuilder = new StringBuilder((int)(guidLen + 1));
+            Dvc_GetRecordingDevice(modulePtr_, index, nameBuilder, nameLen, guidBuilder, guidLen);
+            guid = guidBuilder.ToString();
+            return nameBuilder.ToString();
+        }
+        
+        public string Dvc_GetVideoDevice(uint index, ref string guid)
+        {
+            uint nameLen = 64, guidLen = 64;
+            var nameBuilder = new StringBuilder((int)(nameLen + 1));
+            var guidBuilder = new StringBuilder((int)(guidLen + 1));
+            Dvc_GetVideoDevice(modulePtr_, index, nameBuilder, nameLen, guidBuilder, guidLen);
+            guid = guidBuilder.ToString();
+            return nameBuilder.ToString();
+        }
+        
+        public int Dvc_SetPlayoutDevice(uint index)
+        {
+            return Dvc_SetPlayoutDevice(modulePtr_, index);
+        }
+
+        public int Dvc_SetRecordingDevice(uint index)
+        {
+            return Dvc_SetRecordingDevice(modulePtr_, index);
+        }
+
+        public int Dvc_SetVideoDevice(uint index)
+        {
+            return Dvc_SetVideoDevice(modulePtr_, index);
+        }
 
         /// [Module] ///////////////////////////////////////////////////////////////////////////////////////////////
         [DllImport(DllName)]
@@ -1050,6 +1115,36 @@ namespace Siprix
         /// [Devices] ///////////////////////////////////////////////////////////////////////////////////////////////
         [DllImport(DllName)]
         private static extern int Dvc_SetVideoParams(IntPtr module, IntPtr vdo);
+
+        [DllImport(DllName)]
+        private static extern int Dvc_GetPlayoutDevices(IntPtr module, ref uint numberOfDevices);
+        [DllImport(DllName)]
+        private static extern int Dvc_GetRecordingDevices(IntPtr module, ref uint numberOfDevices);
+        [DllImport(DllName)]
+        private static extern int Dvc_GetVideoDevices(IntPtr module, ref uint numberOfDevices);
+
+        [DllImport(DllName)]
+        private static extern int Dvc_GetPlayoutDevice(IntPtr module, uint index,
+                          [MarshalAs(UnmanagedType.LPStr)] StringBuilder? name, uint nameLength,
+                          [MarshalAs(UnmanagedType.LPStr)] StringBuilder? guid, uint guidLength);
+        [DllImport(DllName)]
+        private static extern int Dvc_GetRecordingDevice(IntPtr module, uint index,
+                          [MarshalAs(UnmanagedType.LPStr)] StringBuilder? name, uint nameLength,
+                          [MarshalAs(UnmanagedType.LPStr)] StringBuilder? guid, uint guidLength);
+        [DllImport(DllName)]
+        private static extern int Dvc_GetVideoDevice(IntPtr module, uint index,
+                          [MarshalAs(UnmanagedType.LPStr)] StringBuilder? name, uint nameLength,
+                          [MarshalAs(UnmanagedType.LPStr)] StringBuilder? guid, uint guidLength);
+
+        [DllImport(DllName)]
+        private static extern int Dvc_SetPlayoutDevice(IntPtr module, uint index);
+
+        [DllImport(DllName)]
+        private static extern int Dvc_SetRecordingDevice(IntPtr module, uint index);
+
+        [DllImport(DllName)]
+        private static extern int Dvc_SetVideoDevice(IntPtr module, uint index);
+        
 
         /// [Callbacks] ///////////////////////////////////////////////////////////////////////////////////////////////
         private delegate void OnTrialModeNotified();

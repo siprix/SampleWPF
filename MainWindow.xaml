@@ -6,7 +6,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:SampleWpf"
         Loaded="Window_Loaded" mc:Ignorable="d"
-        Title="Siprix VoIP App" Height="600" Width="600" Closed="Window_Closed">
+        Title="Siprix VoIP App" Height="500" Width="600" Closed="Window_Closed">
     <Window.Resources>
         <DataTemplate x:Key="accRowTemplate">
             <Grid >
@@ -323,14 +323,14 @@
                 </TextBlock>
 
                 <TextBlock Text="Online manual:" Grid.Row="2" Margin="30,0,0,0"/>
-                <TextBlock Grid.Row="2" Margin="140,0,0,0">
+                    <TextBlock Grid.Row="2" Margin="140,0,0,0">
                     <Hyperlink NavigateUri="https://docs.siprix-voip.com" RequestNavigate="Hyperlink_RequestNavigate">
                         <Hyperlink.Inlines>                           
                              <Run Text="docs.siprix-voip.com"/>
                         </Hyperlink.Inlines>
                     </Hyperlink>
-                </TextBlock>
-            </Grid>
+                    </TextBlock>
+                </Grid>
         </TabItem>
 
         <!--Calls Tab -->
@@ -438,7 +438,46 @@
             </Grid>
         </TabItem>
 
-        <!--Logs Tab -->
+        <!--Devices Tab -->
+        <TabItem >
+            <TabItem.Header>
+                <StackPanel Orientation="Horizontal" >
+                    <TextBlock Text="{x:Static local:Icons.headset_mic}" FontFamily="{StaticResource MaterialIconsRegular}"  FontSize="20" />
+                    <TextBlock Text="Devices" Margin="3" VerticalAlignment="Center" />
+                </StackPanel>
+            </TabItem.Header>
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>                    
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <TextBlock  Text="Microphone:" Grid.Row="0"  Margin="5" VerticalAlignment="Center"/>
+                <ComboBox x:Name="cbRecord" Grid.Row="0" Grid.Column="1" Margin="5"
+                    ItemsSource="{Binding Path=Record}" DisplayMemberPath="Name"
+                    SelectedValuePath="Index" SelectedValue="{Binding Path=SelectedRecord}"
+                />
+
+                <TextBlock  Text="Speaker:" Grid.Row="1"  Margin="5" VerticalAlignment="Center"/>
+                <ComboBox x:Name="cbPlayback" Grid.Row="1" Grid.Column="1" Margin="5"
+                    ItemsSource="{Binding Path=Playback}" DisplayMemberPath="Name"
+                    SelectedValuePath="Index" SelectedValue="{Binding Path=SelectedPlayback}"
+                />
+
+                <TextBlock  Text="Camera:" Grid.Row="2"  Margin="5" VerticalAlignment="Center"/>
+                <ComboBox x:Name="cbVideo" Grid.Row="2" Grid.Column="1" Margin="5"
+                    ItemsSource="{Binding Path=Video}" DisplayMemberPath="Name"
+                    SelectedValuePath="Index" SelectedValue="{Binding Path=SelectedVideo}"
+                />
+            </Grid>
+        </TabItem>
+
+            <!--Logs Tab -->
         <TabItem>
             <TabItem.Header>
                 <StackPanel Orientation="Horizontal">

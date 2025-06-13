@@ -47,6 +47,12 @@ public partial class MainWindow : Window
         Panel.SetZIndex(callRecentListCtrl_, 2);
 
         OnCalls_CollectionChanged();
+
+        //Devices
+        objModel_.Devices.Load();
+        cbVideo.DataContext    = objModel_.Devices;
+        cbRecord.DataContext   = objModel_.Devices;
+        cbPlayback.DataContext = objModel_.Devices;
     }
 
     private void Window_Closed(object sender, EventArgs e)
