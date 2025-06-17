@@ -391,7 +391,7 @@
         <TabItem >
             <TabItem.Header>
                 <StackPanel Orientation="Horizontal" >
-                    <TextBlock Text="{x:Static local:Icons.text_snippet}" FontFamily="{StaticResource MaterialIconsRegular}"  FontSize="20" />
+                    <TextBlock Text="{x:Static local:Icons.forum}" FontFamily="{StaticResource MaterialIconsRegular}"  FontSize="20" />
                     <TextBlock Text="Messages" Margin="3" VerticalAlignment="Center" />
                 </StackPanel>
             </TabItem.Header>
