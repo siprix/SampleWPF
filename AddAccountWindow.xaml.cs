@@ -22,6 +22,7 @@ public partial class AddAccountWindow : Window
         //Set data to controls
         tbSipServer.Text       = data_.SipServer;
         tbSipExtension.Text    = data_.SipExtension;
+        tbSipAuthId.Text       = data_.SipAuthId;
         tbSipPassword.Password = data_.SipPassword;
         tbExpireTime.Text      = data_.ExpireTime.ToString();
         tbDisplayName.Text     = data_.DisplayName;
@@ -63,6 +64,7 @@ public partial class AddAccountWindow : Window
         //Get data from controls
         data_.SipServer    = tbSipServer.Text;
         data_.SipExtension = tbSipExtension.Text;
+        data_.SipAuthId    = tbSipAuthId.Text;
         data_.SipPassword  = tbSipPassword.Password;
         data_.ExpireTime   = (tbExpireTime.Text.Length==0) ? 0 : uint.Parse(tbExpireTime.Text);
         data_.DisplayName  = tbDisplayName.Text;
