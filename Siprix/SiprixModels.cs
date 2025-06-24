@@ -736,8 +736,11 @@ public class CallsListModel(ObjModel parent_) : INotifyPropertyChanged
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
     }
 
+    public delegate void CallConnectedAppHandler(uint callId, string hdrFrom, string hdrTo, bool withVideo);
     public delegate void CallTerminatedAppHandler(uint callId, uint statusCode);
+
     public event CallTerminatedAppHandler? CallTerminated;
+    public event CallConnectedAppHandler? CallConnected;
 
     public bool IsSwitchedCall(uint callId)
     {
@@ -866,6 +869,10 @@ public class CallsListModel(ObjModel parent_) : INotifyPropertyChanged
 
         var callModel = collection_.Where(a => a.ID == callId).FirstOrDefault();
         callModel?.OnCallConnected(hdrFrom, hdrTo, withVideo);
+
+        parent_.PostAction(new Action(() => {
+            CallConnected?.Invoke(callId, hdrFrom, hdrTo, withVideo);
+        }));
     }
 
     internal void OnCallTerminated(uint callId, uint statusCode)
