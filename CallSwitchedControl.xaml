@@ -120,7 +120,7 @@
         </StackPanel>
 
         <!-- 'Redirect/Transfer' section -->
-        <StackPanel x:Name="gridTransfer" Grid.Row="2" Orientation="Horizontal" Visibility="Collapsed"
+        <StackPanel x:Name="gridTransBlind" Grid.Row="2" Orientation="Horizontal" Visibility="Collapsed"
                     VerticalAlignment="Center" HorizontalAlignment="Center">
 
             <Border Width="120" Height="Auto"  BorderThickness="1" BorderBrush="Gray">
@@ -137,7 +137,24 @@
             </Button>
             
         </StackPanel>
-        
+
+
+        <!-- 'AttendedTransfer' section -->
+        <StackPanel x:Name="gridTransAtt" Grid.Row="2" Orientation="Horizontal" Visibility="Visible"
+            VerticalAlignment="Center" HorizontalAlignment="Center">
+
+            <ComboBox x:Name="cbTransferCalls" Width="180" DisplayMemberPath="NameAndExt" />
+
+            <Button x:Name="bnTransferAttended" Content="Transfer" Height="20" Margin="3,0" HorizontalAlignment="Right"                 
+                Click="TransferAttended_Click"/>
+
+            <Button  Width="20" Height="20"  HorizontalAlignment="Right" Click="TransferAttendedMode_Click">
+                <TextBlock  Text="{x:Static local:Icons.close}" HorizontalAlignment="Center" 
+                    FontFamily="{StaticResource MaterialIconsRegular}" FontSize="18" />
+            </Button>
+
+        </StackPanel>
+
         <!-- 'Send DTMF' section -->
         <Grid x:Name="gridDtmf" Grid.Row="2" Width="Auto" Height="Auto" 
               HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed" >
@@ -256,13 +273,13 @@
                             </MenuItem.Icon>
                         </MenuItem>
 
-                        <MenuItem Header="Transfer attended" Height="24"  IsEnabled="False">
+                        <MenuItem Header="Transfer attended" Height="24" IsEnabled="False" Click="TransferAttendedMode_Click" x:Name="TransferAttendedMenu">
                             <MenuItem.Icon>
                                 <TextBlock Text="{x:Static local:Icons.phone_forwarded}" FontFamily="{StaticResource MaterialIconsRegular}"  FontSize="16" />
                             </MenuItem.Icon>
                         </MenuItem>
 
-                        <MenuItem Header="Transfer" Height="24" Click="TransferBlindMode_Click">
+                        <MenuItem Header="TransferBlind" Height="24" Click="TransferBlindMode_Click">
                             <MenuItem.Icon>
                                 <TextBlock Text="{x:Static local:Icons.forward}" FontFamily="{StaticResource MaterialIconsRegular}"  FontSize="16" />
                             </MenuItem.Icon>

@@ -10,7 +10,7 @@ namespace SampleWpf;
 ///Provides controls for manipulating current/switched call    
 public partial class CallSwitchedControl : System.Windows.Controls.UserControl
 {
-    enum UiMode { eUndef, eMain, eDtmf, eTransferBlind, eTranferAtt };
+    enum UiMode { eUndef, eMain, eDtmf, eTransBlind, eTransAtt };
 
     Siprix.CallModel? callModel_;
     readonly Siprix.CallsListModel calls_;        
@@ -58,8 +58,10 @@ public partial class CallSwitchedControl : System.Windows.Controls.UserControl
     private void onCalls_CollectionChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
     {
         callDurationTimer_.IsEnabled = (calls_.Collection.Count > 0);
-        
-        ConferenceMenu.IsEnabled = (calls_.Collection.Count > 1);//when have 2 or more calls
+
+        //when have 2 or more calls
+        ConferenceMenu.IsEnabled       = (calls_.Collection.Count > 1);
+        TransferAttendedMenu.IsEnabled = (calls_.Collection.Count > 1);
     }
 
     private void onCalls_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
@@ -157,11 +159,12 @@ public partial class CallSwitchedControl : System.Windows.Controls.UserControl
 
         //Connected display depending on input mode
         UiMode uiMode = getUiMode(callModel_?.CallState);
-        bnRedirect.Visibility   = (uiMode == UiMode.eUndef)&&isRinging ? Visibility.Visible : Visibility.Collapsed;
-        gridDtmf.Visibility     = (uiMode == UiMode.eDtmf)          ? Visibility.Visible : Visibility.Collapsed;
-        gridMain.Visibility     = (uiMode == UiMode.eMain)          ? Visibility.Visible : Visibility.Collapsed;
-        gridTransfer.Visibility = (uiMode == UiMode.eTransferBlind) ? Visibility.Visible : Visibility.Collapsed;
-                    
+        bnRedirect.Visibility     = (uiMode == UiMode.eUndef)&&isRinging ? Visibility.Visible : Visibility.Collapsed;
+        gridDtmf.Visibility       = (uiMode == UiMode.eDtmf)             ? Visibility.Visible : Visibility.Collapsed;
+        gridMain.Visibility       = (uiMode == UiMode.eMain)             ? Visibility.Visible : Visibility.Collapsed;
+        gridTransBlind.Visibility = (uiMode == UiMode.eTransBlind)       ? Visibility.Visible : Visibility.Collapsed;
+        gridTransAtt.Visibility   = (uiMode == UiMode.eTransAtt)         ? Visibility.Visible : Visibility.Collapsed;
+
         //bnMakeCall.Visibility = (callModel_ == null) ? Visibility.Visible : Visibility.Collapsed;
         bnHangup.Visibility   = (callModel_ == null)|| isRinging ? Visibility.Collapsed : Visibility.Visible;
 
@@ -200,7 +203,7 @@ public partial class CallSwitchedControl : System.Windows.Controls.UserControl
     private void TransferBlindMode_Click(object sender, RoutedEventArgs e)
     {
         UiMode uiMode = getUiMode(callModel_?.CallState);
-        if (uiMode == UiMode.eTransferBlind)
+        if (uiMode == UiMode.eTransBlind)
         {
             //Hide transfer/redirect edit if displayed
             tbTransferToExt.Text = "";
@@ -209,7 +212,7 @@ public partial class CallSwitchedControl : System.Windows.Controls.UserControl
         else
         {
             //Show transfer/redirect edit if displayed
-            setUiMode(callModel_?.CallState, UiMode.eTransferBlind);
+            setUiMode(callModel_?.CallState, UiMode.eTransBlind);
         }
         updateVisibility();
     }
@@ -217,6 +220,35 @@ public partial class CallSwitchedControl : System.Windows.Controls.UserControl
     private void TransferBlind_Click(object sender, RoutedEventArgs e)
     {
         callModel_?.TransferBlind(tbTransferToExt.Text);
+    }
+
+    private void TransferAttendedMode_Click(object sender, RoutedEventArgs e)
+    {
+        UiMode uiMode = getUiMode(callModel_?.CallState);
+        if (uiMode == UiMode.eTransAtt)
+        {
+            //Hide transfer/redirect edit if displayed
+            setUiMode(callModel_?.CallState, UiMode.eMain);
+        }
+        else
+        {
+            cbTransferCalls.Items.Clear();
+            foreach(Siprix.CallModel call in calls_.Collection)
+            {
+                if(call.ID != callModel_?.ID)
+                    cbTransferCalls.Items.Add(call);
+            }
+
+            //Show transfer/redirect edit if displayed
+            setUiMode(callModel_?.CallState, UiMode.eTransAtt);
+        }
+        updateVisibility();
+    }
+
+    private void TransferAttended_Click(object sender, RoutedEventArgs e)
+    {
+        if (cbTransferCalls.SelectedItem is Siprix.CallModel call) 
+            callModel_?.TransferAttended(call.ID);
     }
 
     private void PlayFile_Click(object sender, RoutedEventArgs e)
