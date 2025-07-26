@@ -445,6 +445,7 @@ EXPORT void     Ini_AddDnsServer(IniData* ini, const char* dns);
 EXPORT void     Ini_SetUseDnsSrv(IniData* ini, bool enabled);
 EXPORT void     Ini_SetRecordStereo(IniData* ini, bool enabled);
 EXPORT void     Ini_SetUnregOnDestroy(IniData* ini, bool enabled);
+EXPORT void     Ini_SetVideoCallEnabled(IniData* ini, bool enabled);
 
 ////////////////////////////////////////////////////////////////////////////
 //Set fields of Dest's data
@@ -464,6 +465,7 @@ EXPORT void     Vdo_SetFramerate(VideoData* vdo, int fps);
 EXPORT void     Vdo_SetBitrate(VideoData* vdo, int bitrateKbps);
 EXPORT void     Vdo_SetHeight(VideoData* vdo, int height);
 EXPORT void     Vdo_SetWidth(VideoData* vdo, int width);
+EXPORT void     Vdo_SetRotation(VideoData* vdo, int degrees);
 
 ////////////////////////////////////////////////////////////////////////////
 //Set fields of SubscrData
