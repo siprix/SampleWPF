@@ -43,6 +43,8 @@ public partial class AddAccountWindow : Window
         cbTransport.IsEnabled    = addNew_;
 
         tbSipServer.Focus();
+
+        tbSipPasswordReveal.TextChanged += tbSipPasswordReveal_TextChanged;
     }
 
     private void Cancel_Click(object sender, RoutedEventArgs e)
@@ -106,6 +108,11 @@ public partial class AddAccountWindow : Window
             tbSipPasswordReveal.Visibility = Visibility.Hidden;
             tbSipPassword.Visibility = Visibility.Visible;
         }
+    }
+
+    private void tbSipPasswordReveal_TextChanged(object sender, System.Windows.Controls.TextChangedEventArgs e)
+    {
+        tbSipPassword.Password = tbSipPasswordReveal.Text;
     }
 
     public void AddItemsToBindAddressCombobox()
