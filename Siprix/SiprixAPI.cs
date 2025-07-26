@@ -133,6 +133,7 @@ namespace Siprix
         public string?   BrandName;
         public bool?     UseDnsSrv;
         public bool?     RecordStereo;
+        public bool?     VideoCallEnabled;
         public List<string>? DnsServers;
 
     }//IniData
@@ -206,11 +207,12 @@ namespace Siprix
 
     public class VideoData
     {
-        public String? noCameraImgPath;/// Path to jpg file path to the jpg file with image, which library will send when video device not available.          
+        public string? noCameraImgPath;/// Path to jpg file path to the jpg file with image, which library will send when video device not available.          
         public int?  framerateFps;/// Capturer framerate (by default 15)
         public int?  bitrateKbps;/// Encoder bitrate, allows specify video bandwith (by default 600)        
         public int?  height;/// Capturer video frame height (by default 480)
         public int?  width;/// Capturer video frame width (by default 600)
+        public int?  rotation;/// Capturer video frame rotation degrees (by default 0, allowed values 0,90,180,270)
     }
 
     public static class ErrorCode
@@ -756,6 +758,8 @@ namespace Siprix
         private static extern void Ini_SetUseDnsSrv(IntPtr ini, bool enabled);
         [DllImport(DllName)]
         private static extern void Ini_SetRecordStereo(IntPtr ini, bool enabled);
+        [DllImport(DllName)]
+        private static extern void Ini_SetVideoCallEnabled(IntPtr ini, bool enabled);
 
         private static IntPtr getNative(IniData iniData)
         {
@@ -771,6 +775,7 @@ namespace Siprix
             if (iniData.BrandName            != null) Ini_SetBrandName(ptr,         iniData.BrandName);
             if (iniData.UseDnsSrv            != null) Ini_SetUseDnsSrv(ptr,         iniData.UseDnsSrv.Value);
             if (iniData.RecordStereo         != null) Ini_SetRecordStereo(ptr,      iniData.RecordStereo.Value);
+            if (iniData.VideoCallEnabled     != null) Ini_SetVideoCallEnabled(ptr,  iniData.VideoCallEnabled.Value);
 
             if (iniData.DnsServers != null)
             {
@@ -1099,6 +1104,8 @@ namespace Siprix
         private static extern void Vdo_SetHeight(IntPtr sub, int height);
         [DllImport(DllName)]
         private static extern void Vdo_SetWidth(IntPtr dest, int width);
+        [DllImport(DllName)]
+        private static extern void Vdo_SetRotation(IntPtr dest, int degrees);
 
         private static IntPtr getNative(VideoData vdoData)
         {
@@ -1108,6 +1115,7 @@ namespace Siprix
             if (vdoData.bitrateKbps != null)     Vdo_SetBitrate(ptr, vdoData.bitrateKbps.Value);
             if (vdoData.height != null)          Vdo_SetHeight(ptr, vdoData.height.Value);
             if (vdoData.width != null)           Vdo_SetWidth(ptr, vdoData.width.Value);
+            if (vdoData.rotation != null)        Vdo_SetRotation(ptr, vdoData.rotation.Value);
             return ptr;
         }
 

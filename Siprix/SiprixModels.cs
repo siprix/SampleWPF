@@ -6,6 +6,7 @@ using System.ComponentModel;
 using System.Windows.Input;
 using System.Diagnostics;
 using System.Text.Json;
+//using Windows.Devices.Sensors;
 
 
 namespace Siprix;
@@ -1327,6 +1328,7 @@ public class MessagesListModel(ObjModel parent_)
         SampleWpf.Properties.Settings.Default.messages = JsonSerializer.Serialize(jsonList);
         SampleWpf.Properties.Settings.Default.Save();
     }
+
     public void LoadFromJson()
     {
         string jsonString = SampleWpf.Properties.Settings.Default.messages;
@@ -1719,6 +1721,7 @@ public class ObjModel
         iniData.LogLevelIde = LogLevel.Debug;
         iniData.LogLevelFile = LogLevel.Debug;
         iniData.WriteDmpUnhandledExc = true;
+        //iniData.VideoCallEnabled = false;
 
         int err = core_.Initialize(eventHandler_, iniData);
 
@@ -1730,12 +1733,17 @@ public class ObjModel
         Logs?.Print("Siprix module initialized successfully");
         Logs?.Print($"Version: {core_.Version()}");
 
+        //SimpleOrientationSensor orientationSensor = SimpleOrientationSensor.GetDefault();
+        //var deviceOrientation = orientationSensor?.GetCurrentOrientation() ?? SimpleOrientation.NotRotated;
+        //bool isUpsideDown = deviceOrientation == SimpleOrientation.Rotated180DegreesCounterclockwise;
+
         //Configure video
-        //VideoData vdoData = new();
+        VideoData vdoData = new();
         //vdoData.noCameraImgPath = "noCamera.jpg";//path to image, which SDK will send to remote side instead of camera
         //vdoData.bitrateKbps = 800;
         //vdoData.width = 640;
         //vdoData.height = 480;
+        //vdoData.rotation = isUpsideDown ? 180 : 0;
         //core_.Dvc_SetVideoParams(vdoData);
 
         //Load saved models
