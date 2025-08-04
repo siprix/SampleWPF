@@ -301,7 +301,7 @@ namespace Siprix
         void OnCallSwitched(CallId callId);
 
         void OnMessageSentState(MessageId messageId, bool success, string response);
-        void OnMessageIncoming(AccountId accId, string hdrFrom, string body);
+        void OnMessageIncoming(MessageId messageId, AccountId accId, string hdrFrom, string body);
     }
 
 
@@ -1185,7 +1185,7 @@ namespace Siprix
 
         private delegate void OnMessageSentState(MessageId messageId, bool success,
                                             [MarshalAs(UnmanagedType.LPUTF8Str)] string response);
-        private delegate void OnMessageIncoming(AccountId accId,
+        private delegate void OnMessageIncoming(MessageId messageId, AccountId accId,
                                             [MarshalAs(UnmanagedType.LPUTF8Str)] string hdrFrom,
                                             [MarshalAs(UnmanagedType.LPUTF8Str)] string body);
 
@@ -1323,9 +1323,9 @@ namespace Siprix
             eventDelegate_?.OnMessageSentState(messageId, success, response);
         }
 
-        void OnMessageIncomingCallback(AccountId accId, string hdrFrom, string body)
+        void OnMessageIncomingCallback(MessageId messageId, AccountId accId, string hdrFrom, string body)
         {
-            eventDelegate_?.OnMessageIncoming(accId, hdrFrom, body);
+            eventDelegate_?.OnMessageIncoming(messageId, accId, hdrFrom, body);
         }
 
     }//Module

@@ -201,7 +201,7 @@ namespace Siprix
             public void OnCallSwitched(uint callId) { }
 
             public void OnMessageSentState(uint messageId, bool success, string response) { }
-            public void OnMessageIncoming(uint accId, string hdrFrom, string body) { }
+            public void OnMessageIncoming(uint messageId, uint accId, string hdrFrom, string body) { }
         }
 
     }//DirectCallModel

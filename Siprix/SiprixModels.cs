@@ -1261,22 +1261,22 @@ public class MessagesListModel(ObjModel parent_)
 
     public ObservableCollection<MessageModel> Collection { get { return collection_; } }
 
-    public int Send(MsgData msg)
+    public int Send(MsgData data)
     {
-        parent_.Logs?.Print($"Sending new message to ext:{msg.ToExt} accId:@{msg.FromAccId}");
+        parent_.Logs?.Print($"Sending new message to ext:{data.ToExt} accId:@{data.FromAccId}");
 
         //Add
-        int err = parent_.Core.Message_Send(msg);
+        int err = parent_.Core.Message_Send(data);
         if (err != ErrorCode.kNoErr)
         {
             parent_.Logs?.Print($"Can't send message Err: {err} {parent_.ErrorText(err)}");
             return err;
         }
 
-        MessageModel msgModel = new(msg, parent_.Accounts.GetUri(msg.FromAccId), isWaiting:true);
+        MessageModel msgModel = new(data, parent_.Accounts.GetUri(data.FromAccId), isWaiting:true);
         collection_.Add(msgModel);
 
-        parent_.Logs?.Print($"Posted successfully with id: {msg.MyMsgId}");
+        parent_.Logs?.Print($"Posted successfully with id: {data.MyMsgId}");
 
         if (collection_.Count > kMaxItems) collection_.RemoveAt(0);
         parent_.PostSaveMessagesChanges();
@@ -1301,15 +1301,15 @@ public class MessagesListModel(ObjModel parent_)
 
         parent_.PostSaveMessagesChanges();
     }
-    internal void OnMessageIncoming(uint accId, string hdrFrom, string body)
+    internal void OnMessageIncoming(uint messageId, uint accId, string hdrFrom, string body)
     {
-        parent_.Logs?.Print($"OnMessageIncoming accId:{accId} hdrFrom:{hdrFrom} body:'{body}'");
+        parent_.Logs?.Print($"OnMessageIncoming msgId:{messageId} accId:{accId} hdrFrom:{hdrFrom} body:'{body}'");
 
         MsgData msg = new();
         msg.Body = body;
         msg.FromAccId = accId;            
         msg.ToExt = CallsListModel.parseExt(hdrFrom);
-        msg.MyMsgId = getInternalMsgId();
+        msg.MyMsgId = messageId;
 
         MessageModel msgModel = new(msg, parent_.Accounts.GetUri(accId), isIncoming:true);
         collection_.Add(msgModel);
@@ -1918,10 +1918,10 @@ public class ObjModel
             }));
         }
 
-        public void OnMessageIncoming(uint accId, string hdrFrom, string body)
+        public void OnMessageIncoming(uint messageId, uint accId, string hdrFrom, string body)
         {
             dispatcher_?.BeginInvoke(new Action(() => {
-                parent_.messagesListModel_.OnMessageIncoming(accId, hdrFrom, body);
+                parent_.messagesListModel_.OnMessageIncoming(messageId, accId, hdrFrom, body);
             }));
         }
     }
