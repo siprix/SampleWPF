@@ -208,7 +208,7 @@ typedef void(*OnCallHeld)(CallId callId, HoldState state);
 typedef void(*OnCallSwitched)(CallId callId);
 
 typedef void(*OnMessageSentState)(MessageId messageId, bool success, const char* response);
-typedef void(*OnMessageIncoming)(AccountId accId, const char* hdrFrom, const char* body);
+typedef void(*OnMessageIncoming)(MessageId messageId, AccountId accId, const char* hdrFrom, const char* body);
 
 ////////////////////////////////////////////////////////////////////////////
 //Events handler interface
@@ -237,7 +237,7 @@ public:
     virtual void OnCallSwitched(CallId callId) = 0;
 
     virtual void OnMessageSentState(MessageId messageId, bool success, const char* response) = 0;
-    virtual void OnMessageIncoming(AccountId accId, const char* hdrFrom, const char* body) = 0;
+    virtual void OnMessageIncoming(MessageId messageId, AccountId accId, const char* hdrFrom, const char* body) = 0;
 };
 
 
