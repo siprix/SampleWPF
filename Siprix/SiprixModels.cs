@@ -134,7 +134,8 @@ public class AccountModel : INotifyPropertyChanged
         if (accData_.UseSipSchemeForTls!= null) dict.Add("UseSipSchemeForTls",accData_.UseSipSchemeForTls.Value);
         if (accData_.RtcpMuxEnabled    != null) dict.Add("RtcpMuxEnabled",    accData_.RtcpMuxEnabled.Value);
         if (accData_.KeepAliveTime     != null) dict.Add("KeepAliveTime",     accData_.KeepAliveTime.Value);
-                                                                    
+        if (accData_.StunServer        != null) dict.Add("StunServer",        accData_.StunServer);
+
         if (accData_.TranspProtocol    != null) dict.Add("TranspProtocol",    accData_.TranspProtocol.Value);
         if (accData_.TranspPort        != null) dict.Add("TranspPort",        accData_.TranspPort.Value);
         if (accData_.TranspTlsCaCert   != null) dict.Add("TranspTlsCaCert",   accData_.TranspTlsCaCert);
@@ -173,8 +174,8 @@ public class AccountModel : INotifyPropertyChanged
                 case "DisplayName":        accData.DisplayName    = strVal; break;                    
                 case "InstanceId":         accData.InstanceId     = strVal; break;
                 case "RingToneFile":       accData.RingToneFile   = strVal; break;
-                
-                
+                case "StunServer":         accData.StunServer     = strVal; break;
+
                 case "SecureMedia":        accData.SecureMediaMode    = (SecureMedia)(prop.Value.GetUInt16()); break;
                 case "UseSipSchemeForTls": accData.UseSipSchemeForTls = prop.Value.GetBoolean(); break;
                 case "RtcpMuxEnabled":     accData.RtcpMuxEnabled     = prop.Value.GetBoolean(); break;

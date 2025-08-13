@@ -160,6 +160,7 @@ namespace Siprix
         public bool?          RtcpMuxEnabled;
         public uint?          KeepAliveTime;
         public bool?          IceEnabled;
+        public string?        StunServer;
 
         public SipTransport?  TranspProtocol;
         public ushort?        TranspPort;
@@ -882,6 +883,7 @@ namespace Siprix
             if (accData.RtcpMuxEnabled    != null) Acc_SetRtcpMuxEnabled(ptr,     accData.RtcpMuxEnabled.Value);
             if (accData.KeepAliveTime     != null) Acc_SetKeepAliveTime(ptr,      accData.KeepAliveTime.Value);
             if (accData.IceEnabled        != null) Acc_SetIceEnabled(ptr,         accData.IceEnabled.Value);
+            if (accData.StunServer        != null) Acc_SetStunServer(ptr,         accData.StunServer);
 
             if (accData.TranspProtocol    != null) Acc_SetTranspProtocol(ptr,     accData.TranspProtocol.Value);
             if (accData.TranspPort        != null) Acc_SetTranspPort(ptr,         accData.TranspPort.Value);
