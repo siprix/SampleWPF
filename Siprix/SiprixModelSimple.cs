@@ -202,6 +202,9 @@ namespace Siprix
 
             public void OnMessageSentState(uint messageId, bool success, string response) { }
             public void OnMessageIncoming(uint messageId, uint accId, string hdrFrom, string body) { }
+
+            public void OnSipNotify(uint accId, string hdrEvent, string body) { }
+            public void OnVuMeterLevel(int micLevel, int spkLevel) { }
         }
 
     }//DirectCallModel

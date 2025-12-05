@@ -347,6 +347,11 @@ public class AccountsListModel(ObjModel parent_) : INotifyPropertyChanged
         accModel?.OnAccountRegState(state, response);
         parent_.Logs?.Print($"OnAccountRegState accId:{accId} state:{state} response:{response}");
     }
+    internal void OnSipNotify(uint accId, string hdrEvent, string body)
+    {
+        var accModel = collection_.Where(a => a.ID == accId).FirstOrDefault();
+        parent_.Logs?.Print($"OnSipNotify accId:{accId} hdrEvent:'{hdrEvent}' body:{body}");
+    }
 
     public void StoreToJson()
     {
@@ -650,8 +655,14 @@ public class CallModel : INotifyPropertyChanged
         int err = parent_.Core.Call_TransferAttended(myCallId_, toCallId);
         if (err == ErrorCode.kNoErr) setCallState(CallState.Transferring);
         else parent_.Logs?.Print($"Cant TransferAttended callId:{myCallId_} Err:{err} {parent_.ErrorText(err)}");
-        return err;            
+        return err;
     }
+
+    public string GetStats()
+    {
+        return parent_.Core.Call_GetStats(myCallId_);
+    }
+
     public int SetVideoWindow(IntPtr hwnd)
     {
         parent_.Logs?.Print($"SetVideoWindow callId:{myCallId_} hwnd:{hwnd}");
@@ -822,9 +833,9 @@ public class CallsListModel(ObjModel parent_) : INotifyPropertyChanged
 
     public bool CanMakeConference { get { return ConfModeStarted || collection_.Count > 1; } }
 
-    public int SetPreviowVideoWindow(IntPtr hwnd)
+    public int SetPreviewVideoWindow(IntPtr hwnd)
     {
-        parent_.Logs?.Print($"SetPreviowVideoWindow hwnd:{hwnd}");
+        parent_.Logs?.Print($"SetPreviewVideoWindow hwnd:{hwnd}");
         return parent_.Core.Call_SetVideoWindow(ErrorCode.kInvalidId, hwnd);
     }
 
@@ -1925,6 +1936,15 @@ public class ObjModel
                 parent_.messagesListModel_.OnMessageIncoming(messageId, accId, hdrFrom, body);
             }));
         }
+
+        public void OnSipNotify(uint accId, string hdrEvent, string body)
+        {
+            dispatcher_?.BeginInvoke(new Action(() => {
+                parent_.accountsListModel_.OnSipNotify(accId, hdrEvent, body);
+            }));
+        }
+
+        public void OnVuMeterLevel(int micLevel, int spkLevel) { }
     }
 
 }//ObjModel

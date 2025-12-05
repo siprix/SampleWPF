@@ -73,7 +73,7 @@ public partial class CallSwitchedControl : System.Windows.Controls.UserControl
                 callModel_.SetVideoWindow(IntPtr.Zero);
             }
 
-            callModel_  = calls_.SwitchedCall;                
+            callModel_  = calls_.SwitchedCall;
             DataContext = callModel_;
 
             resetUiModes();
@@ -84,7 +84,7 @@ public partial class CallSwitchedControl : System.Windows.Controls.UserControl
                 callModel_.SetVideoWindow(receivedVideoHost_[0].Hwnd);
             }
 
-            calls_.SetPreviowVideoWindow(previewVideoHost_.Hwnd);
+            calls_.SetPreviewVideoWindow(previewVideoHost_.Hwnd);
         }
 
         if (e.PropertyName == nameof(Siprix.CallsListModel.ConfModeStarted))
@@ -266,6 +266,11 @@ public partial class CallSwitchedControl : System.Windows.Controls.UserControl
         }
     }
 
+    private void GetStats_Click(object sender, RoutedEventArgs e)
+    {
+        if ((callModel_ == null)) return;
+        string stats = callModel_.GetStats();
+    }
     private void RecordFile_Click(object sender, RoutedEventArgs e)
     {
         if ((callModel_ == null)) return;
@@ -304,7 +309,7 @@ public partial class CallSwitchedControl : System.Windows.Controls.UserControl
         if(!calls_.ConfModeStarted && calls_.SwitchedCall!=null)
             calls_.SwitchedCall.SetVideoWindow(receivedVideoHost_[0].Hwnd);
 
-        calls_.SetPreviowVideoWindow(previewVideoHost_.Hwnd);
+        calls_.SetPreviewVideoWindow(previewVideoHost_.Hwnd);
     }
 
 

@@ -298,6 +298,13 @@
                                 <TextBlock Text="{x:Static local:Icons.radio_button_checked}" FontFamily="{StaticResource MaterialIconsRegular}"  FontSize="16" />
                             </MenuItem.Icon>
                         </MenuItem>
+
+                        <Separator />
+                        <MenuItem Header="Get stats" Height="24" IsEnabled="{Binding IsConnected, Mode=OneWay}"  Click="GetStats_Click">
+                            <MenuItem.Icon>
+                                <TextBlock Text="{x:Static local:Icons.analytics}" FontFamily="{StaticResource MaterialIconsRegular}"  FontSize="16" />
+                            </MenuItem.Icon>
+                        </MenuItem>
                     </ContextMenu >
                 </Button.ContextMenu>
             </Button>

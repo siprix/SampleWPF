@@ -65,7 +65,8 @@ namespace Siprix
         PCMU = 70,
         PCMA = 71,
         DTMF = 72,
-        CN = 73
+        CN   = 73,
+        G729 = 74
     };
 
     public enum VideoCodec : byte
@@ -134,6 +135,9 @@ namespace Siprix
         public bool?     UseDnsSrv;
         public bool?     RecordStereo;
         public bool?     VideoCallEnabled;
+        public bool?     Aes128Sha32Enabled;
+        public bool?     VUmeterEnabled;
+
         public List<string>? DnsServers;
 
     }//IniData
@@ -143,7 +147,7 @@ namespace Siprix
     {
         public AccountId MyAccId = 0;//Assigned by module in 'Account_Add'
         public string  SipServer ="";
-        public string  SipExtension = "";        
+        public string  SipExtension = "";
         public string  SipPassword = "";
          
         public uint    ExpireTime = 300;
@@ -303,6 +307,9 @@ namespace Siprix
 
         void OnMessageSentState(MessageId messageId, bool success, string response);
         void OnMessageIncoming(MessageId messageId, AccountId accId, string hdrFrom, string body);
+
+        void OnSipNotify(AccountId accId, string hdrEvent, string body);
+        void OnVuMeterLevel(int micLevel, int spkLevel);
     }
 
 
@@ -334,6 +341,10 @@ namespace Siprix
         private readonly OnMessageSentState    onMessageSentState_;
         private readonly OnMessageIncoming     onMessageIncoming_;
 
+        private readonly OnSipNotify           onSipNotify_;
+        private readonly OnVuMeterLevel        onVuMeterLevel_;
+
+
         public CoreService()
         {
             onTrialModeNotified_   = new OnTrialModeNotified     (OnTrialModeNotifiedCallback);
@@ -357,6 +368,9 @@ namespace Siprix
 
             onMessageSentState_   = new OnMessageSentState       (OnMessageSentStateCallback);
             onMessageIncoming_    = new OnMessageIncoming        (OnMessageIncomingCallback);
+
+            onSipNotify_          = new OnSipNotify              (OnSipNotifyCallback);
+            onVuMeterLevel_       = new OnVuMeterLevel           (OnVuMeterLevelCallback);
         }
 
         ~CoreService()
@@ -415,6 +429,9 @@ namespace Siprix
 
             Callback_SetMessageSentState(modulePtr_,     onMessageSentState_);
             Callback_SetMessageIncoming(modulePtr_,      onMessageIncoming_);
+
+            Callback_SetSipNotify(modulePtr_,            onSipNotify_);
+            Callback_SetVuMeterLevel(modulePtr_,         onVuMeterLevel_);
             return err;
         }
 
@@ -445,6 +462,11 @@ namespace Siprix
         public uint VersionCode()
         {
             return (modulePtr_ != IntPtr.Zero) ? Module_VersionCode(modulePtr_) : 0;
+        }
+
+        public void WriteLog(string text)
+        {
+            if (modulePtr_ != IntPtr.Zero) Module_WriteLog(modulePtr_, text);
         }
 
         public string ErrorText(int code)
@@ -526,6 +548,21 @@ namespace Siprix
             else return string.Empty;
         }
 
+        public string Call_GetStats(CallId callId)
+        {
+            uint initLen = 2000, requiredLen = initLen;
+            var sb = new StringBuilder((int)initLen);
+            int err = Call_GetStats(modulePtr_, callId, sb, ref requiredLen);
+            if (err != ErrorCode.kNoErr) return string.Empty;
+
+            bool longerStrRequired = (requiredLen > initLen);
+            sb.Length = (int)requiredLen;
+            if (longerStrRequired)
+                Call_GetStats(modulePtr_, callId, sb, ref requiredLen);
+
+            return sb.ToString();
+        }
+
         public string Call_GetNonce(CallId callId)
         {
             uint nonceValLen = 0;
@@ -599,6 +636,11 @@ namespace Siprix
         public int Call_Renegotiate(CallId callId)
         {
             return Call_Renegotiate(modulePtr_, callId);
+        }
+
+        public int Call_UpgradeToVideo(CallId callId)
+        {
+            return Call_UpgradeToVideo(modulePtr_, callId);
         }
 
         public int Call_StopRingtone()
@@ -716,12 +758,15 @@ namespace Siprix
         private static extern int Module_UnInitialize(IntPtr modulePtr);
         [DllImport(DllName)]
         private static extern bool Module_IsInitialized(IntPtr modulePtr);
-        [DllImport(DllName)]        
+        [DllImport(DllName)]
         private static extern IntPtr Module_HomeFolder(IntPtr modulePtr);
         [DllImport(DllName)]
         private static extern IntPtr Module_Version(IntPtr modulePtr);
         [DllImport(DllName)]
         private static extern uint Module_VersionCode(IntPtr modulePtr);
+        [DllImport(DllName)]
+        private static extern void Module_WriteLog(IntPtr modulePtr,
+                        [MarshalAs(UnmanagedType.LPUTF8Str)] string text);
         [DllImport(DllName)]
         private static extern IntPtr GetErrorText(int code);
 
@@ -761,6 +806,10 @@ namespace Siprix
         private static extern void Ini_SetRecordStereo(IntPtr ini, bool enabled);
         [DllImport(DllName)]
         private static extern void Ini_SetVideoCallEnabled(IntPtr ini, bool enabled);
+        [DllImport(DllName)]
+        private static extern void Ini_SetAes128Sha32Enabled(IntPtr ini, bool enabled);
+        [DllImport(DllName)]
+        private static extern void Ini_SetVUmeterEnabled(IntPtr ini, bool enabled);
 
         private static IntPtr getNative(IniData iniData)
         {
@@ -776,7 +825,9 @@ namespace Siprix
             if (iniData.BrandName            != null) Ini_SetBrandName(ptr,         iniData.BrandName);
             if (iniData.UseDnsSrv            != null) Ini_SetUseDnsSrv(ptr,         iniData.UseDnsSrv.Value);
             if (iniData.RecordStereo         != null) Ini_SetRecordStereo(ptr,      iniData.RecordStereo.Value);
-            if (iniData.VideoCallEnabled     != null) Ini_SetVideoCallEnabled(ptr,  iniData.VideoCallEnabled.Value);
+            if (iniData.VideoCallEnabled     != null) Ini_SetVideoCallEnabled(ptr,  iniData.VideoCallEnabled.Value);  
+            if (iniData.Aes128Sha32Enabled   != null) Ini_SetAes128Sha32Enabled(ptr,iniData.Aes128Sha32Enabled.Value);
+            if (iniData.VUmeterEnabled       != null) Ini_SetVUmeterEnabled(ptr,    iniData.VUmeterEnabled.Value);
 
             if (iniData.DnsServers != null)
             {
@@ -983,13 +1034,18 @@ namespace Siprix
         private static extern int Call_GetHoldState(IntPtr module, CallId callId, ref HoldState state);
         [DllImport(DllName)]
         private static extern int Call_GetNonce(IntPtr module, CallId callId, 
-				                        [MarshalAs(UnmanagedType.LPStr)] StringBuilder? nonceVal, 
+                                       [MarshalAs(UnmanagedType.LPStr)] StringBuilder? nonceVal, 
                                         ref uint nonceValLen);
         [DllImport(DllName)]
         private static extern int Call_GetSipHeader(IntPtr module, CallId callId,
                                 [MarshalAs(UnmanagedType.LPUTF8Str)] string hdrName,
                                 [MarshalAs(UnmanagedType.LPStr)] StringBuilder? hdrVal, 
                                 ref uint hdrValLen);
+        [DllImport(DllName)]
+        private static extern int Call_GetStats(IntPtr module, CallId callId,
+                                [MarshalAs(UnmanagedType.LPStr)] StringBuilder? statsVal,
+                                ref uint statsValLen);
+
         [DllImport(DllName)]
         private static extern int Call_MuteMic(IntPtr module, CallId callId, bool mute);
         [DllImport(DllName)]
@@ -1023,7 +1079,8 @@ namespace Siprix
 
         [DllImport(DllName)]
         private static extern int Call_Renegotiate(IntPtr module, CallId callId);
-
+        [DllImport(DllName)]
+        private static extern int Call_UpgradeToVideo(IntPtr module, CallId callId);
         [DllImport(DllName)]
         private static extern int Call_StopRingtone(IntPtr module);
 
@@ -1158,7 +1215,7 @@ namespace Siprix
 
         /// [Callbacks] ///////////////////////////////////////////////////////////////////////////////////////////////
         private delegate void OnTrialModeNotified();
-        private delegate void OnDevicesAudioChanged();        
+        private delegate void OnDevicesAudioChanged();
         private delegate void OnAccountRegState(AccountId accId, RegState state, 
                                             [MarshalAs(UnmanagedType.LPUTF8Str)] string response);
         private delegate void OnSubscriptionState(SubscriptionId subId, SubscriptionState state,
@@ -1190,6 +1247,12 @@ namespace Siprix
         private delegate void OnMessageIncoming(MessageId messageId, AccountId accId,
                                             [MarshalAs(UnmanagedType.LPUTF8Str)] string hdrFrom,
                                             [MarshalAs(UnmanagedType.LPUTF8Str)] string body);
+
+        private delegate void OnSipNotify(AccountId accId,
+                                            [MarshalAs(UnmanagedType.LPUTF8Str)] string hdrEvent,
+                                            [MarshalAs(UnmanagedType.LPUTF8Str)] string body);
+
+        private delegate void OnVuMeterLevel(int micLevel, int spkLevel);
 
         [DllImport(DllName)]
         private static extern int Callback_SetTrialModeNotified(IntPtr module, OnTrialModeNotified callback);
@@ -1228,6 +1291,10 @@ namespace Siprix
         [DllImport(DllName)]
         private static extern int Callback_SetMessageIncoming(IntPtr module, OnMessageIncoming callback);
 
+        [DllImport(DllName)]
+        private static extern int Callback_SetSipNotify(IntPtr module, OnSipNotify callback);
+        [DllImport(DllName)]
+        private static extern int Callback_SetVuMeterLevel(IntPtr module, OnVuMeterLevel callback);
 
         void OnTrialModeNotifiedCallback()
         {
@@ -1328,6 +1395,16 @@ namespace Siprix
         void OnMessageIncomingCallback(MessageId messageId, AccountId accId, string hdrFrom, string body)
         {
             eventDelegate_?.OnMessageIncoming(messageId, accId, hdrFrom, body);
+        }
+
+        void OnSipNotifyCallback(AccountId accId, string hdrEvent, string body)
+        {
+            eventDelegate_?.OnSipNotify(accId, hdrEvent, body);
+        }
+
+        void OnVuMeterLevelCallback(int micLevel, int spkLevel)
+        {
+            eventDelegate_?.OnVuMeterLevel(micLevel, spkLevel);
         }
 
     }//Module
