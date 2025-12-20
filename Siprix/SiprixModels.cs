@@ -1014,6 +1014,7 @@ public class SubscriptionModel : INotifyPropertyChanged
     public uint ID { get { return subData_.MySubId; } }
     public string ToExt { get { return subData_.ToExt; } set { subData_.ToExt = value; } }
     public uint AccId { get { return subData_.FromAccId; } set { subData_.FromAccId = value; } }
+    public string? Body { get { return subData_.Body; } set { subData_.Body = value; } }
     public bool IsWaiting { get { return (internalState_ == SubscriptionState.Created); } }
     public bool IsBlinking { get { return (BLFState == BLFState.Early); } }
     public string AccUri { get; set; } = string.Empty;
@@ -1448,6 +1449,7 @@ public class CdrModel : INotifyPropertyChanged
         IsConnected = true;
         NotifyPropertyChanged(nameof(WithVideo));
         NotifyPropertyChanged(nameof(IsConnected));
+        NotifyPropertyChanged(nameof(State));
     }
 
     public void SetTerminated(uint statusCode, string duration)
@@ -1458,6 +1460,7 @@ public class CdrModel : INotifyPropertyChanged
         //NotifyPropertyChanged(nameof(DisplName));
         NotifyPropertyChanged(nameof(StatusCode));
         NotifyPropertyChanged(nameof(Duration));
+        NotifyPropertyChanged(nameof(State));
     }
 
 }//CdrModel
@@ -1764,6 +1767,12 @@ public class ObjModel
         subscrListModel_.LoadFromJson();
         cdrsListModel_.LoadFromJson();
         return err;
+    }
+
+    public void PlayTone(string tone, short durationMs=250)
+    {
+        uint playerId=0;
+        core_.Call_PlayTone(0, tone, durationMs, ref playerId);
     }
 
     public void UnInitialize()

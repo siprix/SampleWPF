@@ -200,6 +200,7 @@ namespace Siprix
         public string    MimeSubType="";
         public string    EventType="";
         public uint?     ExpireTime;
+        public string?   Body;
     }
 
     public class MsgData
@@ -596,6 +597,11 @@ namespace Siprix
         public int Call_PlayFile(CallId callId, string pathToMp3File, bool loop, ref PlayerId playerId)
         {
             return Call_PlayFile(modulePtr_, callId, pathToMp3File, loop, ref playerId);
+        }
+
+        public int Call_PlayTone(CallId callId, string tone, Int16 durationMs, ref PlayerId playerId)
+        {
+            return Call_PlayTone(modulePtr_, callId, tone, durationMs, ref playerId);
         }
 
         public int Call_StopFile(PlayerId playerId)
@@ -1059,6 +1065,10 @@ namespace Siprix
                                         [MarshalAs(UnmanagedType.LPUTF8Str)] string pathToMp3File, bool loop,
                                         ref PlayerId playerId);
         [DllImport(DllName)]
+        private static extern int Call_PlayTone(IntPtr module, CallId callId,
+                                        [MarshalAs(UnmanagedType.LPUTF8Str)] string tone, Int16 durationMs,
+                                        ref PlayerId playerId);
+        [DllImport(DllName)]
         private static extern int Call_StopFile(IntPtr module, PlayerId playerId);
         [DllImport(DllName)]
         private static extern int Call_RecordFile(IntPtr module, CallId callId,
@@ -1135,7 +1145,9 @@ namespace Siprix
         private static extern void Subscr_SetEventType(IntPtr sub, [MarshalAs(UnmanagedType.LPUTF8Str)] string eventType);
         [DllImport(DllName)]
         private static extern void Subscr_SetExpireTime(IntPtr dest, uint expireTimeSec);
-        
+        [DllImport(DllName)]
+        private static extern void Subscr_SetBody(IntPtr sub, [MarshalAs(UnmanagedType.LPUTF8Str)] string body);
+
         private static IntPtr getNative(SubscrData subData)
         {
             IntPtr ptr = Subscr_GetDefault();
@@ -1146,6 +1158,9 @@ namespace Siprix
 
             if (subData.ExpireTime != null)
                 Subscr_SetExpireTime(ptr, subData.ExpireTime.Value);
+
+            if(subData.Body != null)
+                Subscr_SetBody(ptr, subData.Body);
 
             return ptr;
         }
