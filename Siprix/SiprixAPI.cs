@@ -209,6 +209,7 @@ namespace Siprix
         public string ToExt = "";
         public AccountId FromAccId = 0;
         public string Body = "";
+        public string? ContentType;
     }
 
     public class VideoData
@@ -1116,12 +1117,18 @@ namespace Siprix
         [DllImport(DllName)]
         private static extern void Msg_SetBody(IntPtr sub, [MarshalAs(UnmanagedType.LPUTF8Str)] string body);
 
+        [DllImport(DllName)]
+        private static extern void Msg_SetContentType(IntPtr sub, [MarshalAs(UnmanagedType.LPUTF8Str)] string contentType);
+
         private static IntPtr getNative(MsgData msgData)
         {
             IntPtr ptr = Msg_GetDefault();
             Msg_SetExtension(ptr, msgData.ToExt);
             Msg_SetAccountId(ptr, msgData.FromAccId);
             Msg_SetBody(ptr, msgData.Body);
+
+            if (msgData.ContentType != null)
+                Msg_SetContentType(ptr, msgData.ContentType);
             return ptr;
         }
 
