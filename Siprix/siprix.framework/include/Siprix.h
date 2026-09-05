@@ -162,7 +162,8 @@ enum VideoCodec : uint8_t
     H264 = 80,
     VP8  = 81,
     VP9  = 82,
-    AV1  = 83
+    AV1  = 83,
+    H264_PM0 = 84
 };
 
 
@@ -376,6 +377,7 @@ EXPORT ErrorCode Dvc_GetVideoDevice(ISiprixModule* module, uint16_t index,
 
 EXPORT ErrorCode Dvc_SetPlayoutDevice(ISiprixModule* module, uint16_t index);
 EXPORT ErrorCode Dvc_SetRecordingDevice(ISiprixModule* module, uint16_t index);
+EXPORT bool      Dvc_IsSelected(ISiprixModule* module, const char* guid);
 
 EXPORT ErrorCode Dvc_SetVideoDevice(ISiprixModule* module, uint16_t index);
 EXPORT ErrorCode Dvc_SetVideoParams(ISiprixModule* module, VideoData* params);
@@ -443,6 +445,8 @@ EXPORT void     Acc_SetKeepAliveTime(AccData* acc, uint32_t keepAliveTimeSec);
 EXPORT void     Acc_SetTranspProtocol(AccData* acc, SipTransport transp);
 EXPORT void     Acc_SetTranspPort(AccData* acc, uint16_t transpPort);
 EXPORT void     Acc_SetTranspTlsCaCert(AccData* acc, const char* pathToCaCertPem);
+EXPORT void     Acc_SetTranspTlsClientCert(AccData* acc, const char* clientCertPem, 
+                                           const char* clientKeyPem, const char* clientKeyPass);
 EXPORT void     Acc_SetTranspBindAddr(AccData* acc, const char* ipAddr);
 EXPORT void     Acc_SetTranspPreferIPv6(AccData* acc, bool prefer);
 
@@ -481,6 +485,7 @@ EXPORT void     Ini_SetVideoCallEnabled(IniData* ini, bool enabled);
 EXPORT void     Ini_SetTranspForceIPv4(IniData* ini, bool enabled);
 EXPORT void     Ini_SetAes128Sha32Enabled(IniData* ini, bool enabled);
 EXPORT void     Ini_SetVUmeterEnabled(IniData* ini, bool enabled);
+EXPORT void     Ini_SetUpdRegOnResume(IniData* ini, bool enabled);
 
 ////////////////////////////////////////////////////////////////////////////
 //Set fields of Dest's data

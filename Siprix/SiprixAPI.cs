@@ -74,7 +74,8 @@ namespace Siprix
         H264 = 80,
         VP8 = 81,
         VP9 = 82,
-        AV1 = 83
+        AV1 = 83, 
+        H264_PM0 = 84
     };
 
 
@@ -169,6 +170,10 @@ namespace Siprix
         public SipTransport?  TranspProtocol;
         public ushort?        TranspPort;
         public string?        TranspTlsCaCert;
+        public string?        TranspTlsClientCert;
+        public string?        TranspTlsClientKey;
+        public string?        TranspTlsClientKeyPass;
+
         public string?        TranspBindAddr;
         public bool?          TranspPreferIPv6;
         public bool?          RewriteContactIp;
@@ -756,6 +761,11 @@ namespace Siprix
             return Dvc_SetVideoDevice(modulePtr_, index);
         }
 
+        public bool Dvc_IsSelected(string guid)
+        {
+            return Dvc_IsSelected(modulePtr_, guid);
+        }
+
         /// [Module] ///////////////////////////////////////////////////////////////////////////////////////////////
         [DllImport(DllName)]
         private static extern IntPtr Module_Create();
@@ -897,6 +907,11 @@ namespace Siprix
         private static extern void Acc_SetTranspTlsCaCert(IntPtr acc, 
                                     [MarshalAs(UnmanagedType.LPUTF8Str)] string pathToCaCertPem);
         [DllImport(DllName)]
+        private static extern void Acc_SetTranspTlsClientCert(IntPtr acc,
+                                    [MarshalAs(UnmanagedType.LPUTF8Str)] string pathToClientCertPem,
+                                    [MarshalAs(UnmanagedType.LPUTF8Str)] string pathToClientKeyPem,
+                                    [MarshalAs(UnmanagedType.LPUTF8Str)] string pathToClientKeyPass);
+        [DllImport(DllName)]
         private static extern void Acc_SetTranspBindAddr(IntPtr acc, [MarshalAs(UnmanagedType.LPUTF8Str)] string ipAddr);
         [DllImport(DllName)]
         private static extern void Acc_SetTranspPreferIPv6(IntPtr acc, bool prefer);
@@ -950,6 +965,12 @@ namespace Siprix
             if (accData.TranspPreferIPv6  != null) Acc_SetTranspPreferIPv6(ptr,   accData.TranspPreferIPv6.Value);
             if (accData.RewriteContactIp  != null) Acc_SetRewriteContactIp(ptr,   accData.RewriteContactIp.Value);
             if (accData.VerifyIncomingCall!= null) Acc_SetVerifyIncomingCall(ptr, accData.VerifyIncomingCall.Value);
+
+            if(accData.TranspTlsClientCert != null)
+            {
+                Acc_SetTranspTlsClientCert(ptr, accData.TranspTlsClientCert,                
+                    accData.TranspTlsClientKey ??"", accData.TranspTlsClientKeyPass ?? "");
+            }
 
             if (accData.AudioCodecs != null)
             {
@@ -1232,8 +1253,11 @@ namespace Siprix
         private static extern int Dvc_SetRecordingDevice(IntPtr module, uint index);
 
         [DllImport(DllName)]
-        private static extern int Dvc_SetVideoDevice(IntPtr module, uint index);
         
+        private static extern int Dvc_SetVideoDevice(IntPtr module, uint index);
+        [DllImport(DllName)]
+        private static extern bool Dvc_IsSelected(IntPtr module, [MarshalAs(UnmanagedType.LPUTF8Str)] string guid);
+
 
         /// [Callbacks] ///////////////////////////////////////////////////////////////////////////////////////////////
         private delegate void OnTrialModeNotified();
