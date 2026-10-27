@@ -95,7 +95,12 @@ enum ErrorCode : int32_t
 
     EMsgBodyCantBeEmpty  = -1085,
 
-    EMicPermRequired     = -1111
+    EMicPermRequired     = -1111,
+
+    ELogFileUploadTime   = -1200,
+    ELogFileNotFound     = -1201,
+    ELogFileDescrShort   = -1202,
+    ELogFileUploadErr    = -1203,
 };
 
 enum LogLevel : uint8_t
@@ -218,6 +223,7 @@ typedef void(*OnCallDtmfReceived)(CallId callId, uint16_t tone);
 typedef void(*OnCallVideoUpgraded)(CallId callId, bool withVideo);
 typedef void(*OnCallVideoUpgradeRequested)(CallId callId);
 typedef void(*OnCallHeld)(CallId callId, HoldState state);
+typedef void(*OnCallUpdated)(CallId callId);
 typedef void(*OnCallSwitched)(CallId callId);
 
 typedef void(*OnMessageSentState)(MessageId messageId, bool success, const char* response);
@@ -225,6 +231,8 @@ typedef void(*OnMessageIncoming)(MessageId messageId, AccountId accId, const cha
 
 typedef void(*OnSipNotify)(AccountId accId, const char* hdrEvent, const char* body);
 typedef void(*OnVuMeterLevel)(int micLevel, int spkLevel);
+
+typedef void(*OnLogUploadState)(bool success, const char* response);
 
 ////////////////////////////////////////////////////////////////////////////
 //Events handler interface
@@ -252,6 +260,7 @@ public:
     virtual void OnCallVideoUpgraded(CallId callId, bool withVideo) = 0;
     virtual void OnCallVideoUpgradeRequested(CallId callId) = 0;
     virtual void OnCallHeld(CallId callId, HoldState state) = 0;
+    virtual void OnCallUpdated(CallId callId) {}
     virtual void OnCallSwitched(CallId callId) = 0;
 
     virtual void OnMessageSentState(MessageId messageId, bool success, const char* response) = 0;
@@ -259,6 +268,8 @@ public:
 
     virtual void OnSipNotify(AccountId accId, const char* hdrEvent, const char* body) = 0;
     virtual void OnVuMeterLevel(int micLevel, int spkLevel) {}
+
+    virtual void OnLogUploadState(bool success, const char* response) {}
 };
 
 
@@ -305,13 +316,14 @@ EXPORT const char* Module_HomeFolder(ISiprixModule* module);
 EXPORT const char* Module_Version(ISiprixModule* module);
 EXPORT uint32_t    Module_VersionCode(ISiprixModule* module);
 EXPORT void        Module_WriteLog(ISiprixModule* module, const char* text);
+EXPORT ErrorCode   Module_UploadLogFile(ISiprixModule* module, const char* description);
 
 ////////////////////////////////////////////////////////////////////////////
 //Manage Accounts
 EXPORT ErrorCode Account_Add(ISiprixModule* module, AccData* acc, AccountId* accId);
 EXPORT ErrorCode Account_Update(ISiprixModule* module, AccData* acc, AccountId accId);
 EXPORT ErrorCode Account_GetRegState(ISiprixModule* module, AccountId accId, RegState* state);
-EXPORT ErrorCode Account_Register(ISiprixModule* module, AccountId accId, uint32_t expireTime);
+EXPORT ErrorCode Account_Register(ISiprixModule* module, AccountId accId, uint32_t expireTimeSec);
 EXPORT ErrorCode Account_Unregister(ISiprixModule* module, AccountId accId);
 EXPORT ErrorCode Account_Delete(ISiprixModule* module, AccountId accId);
 
@@ -347,6 +359,7 @@ EXPORT ErrorCode Call_GetStats(ISiprixModule* module, CallId callId, char* stats
 EXPORT ErrorCode Call_PlayTone(ISiprixModule* module, CallId callId, const char* tone, 
                                 uint16_t durationMs, PlayerId* playerId);
 EXPORT ErrorCode Call_StopRingtone(ISiprixModule* module);
+EXPORT ErrorCode Call_OverrideRingtone(ISiprixModule* module, CallId callId, const char* ringtonePath);
 
 ////////////////////////////////////////////////////////////////////////////
 //Mixer
@@ -377,6 +390,11 @@ EXPORT ErrorCode Dvc_GetVideoDevice(ISiprixModule* module, uint16_t index,
 
 EXPORT ErrorCode Dvc_SetPlayoutDevice(ISiprixModule* module, uint16_t index);
 EXPORT ErrorCode Dvc_SetRecordingDevice(ISiprixModule* module, uint16_t index);
+EXPORT ErrorCode Dvc_SetRingtoneDevice(ISiprixModule* module, uint16_t index);
+
+EXPORT ErrorCode Dvc_GetSelRingtoneDevice(ISiprixModule* module,  char* guid, uint32_t guidLength);
+EXPORT ErrorCode Dvc_GetSelPlayoutDevice(ISiprixModule* module,   char* guid, uint32_t guidLength);
+EXPORT ErrorCode Dvc_GetSelRecordingDevice(ISiprixModule* module, char* guid, uint32_t guidLength);
 EXPORT bool      Dvc_IsSelected(ISiprixModule* module, const char* guid);
 
 EXPORT ErrorCode Dvc_SetVideoDevice(ISiprixModule* module, uint16_t index);
@@ -406,12 +424,14 @@ EXPORT ErrorCode Callback_SetCallVideoUpgradeRequested(ISiprixModule* module, On
 
 EXPORT ErrorCode Callback_SetCallSwitched(ISiprixModule* module, OnCallSwitched callback);
 EXPORT ErrorCode Callback_SetCallHeld(ISiprixModule* module, OnCallHeld callback);
+EXPORT ErrorCode Callback_SetCallUpdated(ISiprixModule* module, OnCallUpdated callback);
 
 EXPORT ErrorCode Callback_SetMessageSentState(ISiprixModule* module, OnMessageSentState callback);
 EXPORT ErrorCode Callback_SetMessageIncoming(ISiprixModule* module, OnMessageIncoming callback);
 
 EXPORT ErrorCode Callback_SetSipNotify(ISiprixModule* module, OnSipNotify callback);
 EXPORT ErrorCode Callback_SetVuMeterLevel(ISiprixModule* module, OnVuMeterLevel callback);
+EXPORT ErrorCode Callback_SetLogUploadState(ISiprixModule* module, OnLogUploadState callback);
 
 EXPORT ErrorCode Callback_SetEventHandler(ISiprixModule* module, ISiprixEventHandler* handler);
 
@@ -441,10 +461,11 @@ EXPORT void     Acc_SetUseSipSchemeForTls(AccData* acc, bool useSipSchemeForTls)
 EXPORT void     Acc_SetRtcpMuxEnabled(AccData* acc, bool rtcpMuxEnabled);
 EXPORT void     Acc_SetIceEnabled(AccData* acc, bool iceEnabled);
 
+EXPORT void     Acc_SetRegRetryTime(AccData* acc, uint32_t retryTimeSec);
 EXPORT void     Acc_SetKeepAliveTime(AccData* acc, uint32_t keepAliveTimeSec);
 EXPORT void     Acc_SetTranspProtocol(AccData* acc, SipTransport transp);
 EXPORT void     Acc_SetTranspPort(AccData* acc, uint16_t transpPort);
-EXPORT void     Acc_SetTranspTlsCaCert(AccData* acc, const char* pathToCaCertPem);
+EXPORT void     Acc_SetTranspTlsCaCert(AccData* acc, const char* pathToCaCertPemOrBlob);
 EXPORT void     Acc_SetTranspTlsClientCert(AccData* acc, const char* clientCertPem, 
                                            const char* clientKeyPem, const char* clientKeyPass);
 EXPORT void     Acc_SetTranspBindAddr(AccData* acc, const char* ipAddr);

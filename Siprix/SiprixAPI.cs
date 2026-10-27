@@ -151,7 +151,7 @@ namespace Siprix
         public string  SipExtension = "";
         public string  SipPassword = "";
          
-        public uint    ExpireTime = 300;
+        public uint    ExpireTime = 300; //seconds
         public string? SipAuthId;
         public string? SipProxyServer;
 
@@ -163,13 +163,14 @@ namespace Siprix
         public SecureMedia?   SecureMediaMode;
         public bool?          UseSipSchemeForTls;
         public bool?          RtcpMuxEnabled;
-        public uint?          KeepAliveTime;
+        public uint?          KeepAliveTime;//seconds
+        public uint?          RetryTime;//seconds
         public bool?          IceEnabled;
         public string?        StunServer;
 
         public SipTransport?  TranspProtocol;
         public ushort?        TranspPort;
-        public string?        TranspTlsCaCert;
+        public string?        TranspTlsCaCert;//or BLOB (content of the pem file)
         public string?        TranspTlsClientCert;
         public string?        TranspTlsClientKey;
         public string?        TranspTlsClientKeyPass;
@@ -257,7 +258,7 @@ namespace Siprix
         public const int kDestNumberScheme    = -1032;
         public const int kDestBadFormat       = -1033;
         public const int kDestSchemeMismatch  = -1034;
-        public const int kOnlyOneCallAllowed  = -1035;    
+        public const int kOnlyOneCallAllowed  = -1035;
 
         public const int kCallNotFound        = -1040;
         public const int kCallNotIncoming     = -1041;
@@ -289,6 +290,11 @@ namespace Siprix
         public const int kMsgBodyCantBeEmpty  = -1085;
 
         public const int kMicPermRequired     = -1111;
+
+        public const int kLogFileUploadTime   = -1200;
+        public const int kLogFileNotFound     = -1201;
+        public const int kLogFileDescrShort   = -1202;
+        public const int kLogFileUploadErr    = -1203;
     }
 
     public interface IEventDelegate
@@ -310,6 +316,7 @@ namespace Siprix
         void OnCallRedirected(CallId origCallId, CallId relatedCallId, string referTo);
         void OnCallDtmfReceived(CallId callId, ushort tone);
         void OnCallHeld(CallId callId, HoldState state);
+        void OnCallUpdated(CallId callId);
         void OnCallSwitched(CallId callId);
 
         void OnMessageSentState(MessageId messageId, bool success, string response);
@@ -317,6 +324,7 @@ namespace Siprix
 
         void OnSipNotify(AccountId accId, string hdrEvent, string body);
         void OnVuMeterLevel(int micLevel, int spkLevel);
+        void OnLogUploadState(bool success, string response);
     }
 
 
@@ -343,6 +351,7 @@ namespace Siprix
         private readonly OnCallRedirected      onCallRedirected_;
         private readonly OnCallDtmfReceived    onCallDtmfReceived_;
         private readonly OnCallHeld            onCallHeld_;
+        private readonly OnCallUpdated         onCallUpdated_;
         private readonly OnCallSwitched        onCallSwitched_;
 
         private readonly OnMessageSentState    onMessageSentState_;
@@ -350,7 +359,7 @@ namespace Siprix
 
         private readonly OnSipNotify           onSipNotify_;
         private readonly OnVuMeterLevel        onVuMeterLevel_;
-
+        private readonly OnLogUploadState      onLogUploadState_;
 
         public CoreService()
         {
@@ -371,6 +380,7 @@ namespace Siprix
             onCallRedirected_      = new OnCallRedirected        (OnCallRedirectedCallback);
             onCallDtmfReceived_    = new OnCallDtmfReceived      (OnCallDtmfReceivedCallback);
             onCallHeld_            = new OnCallHeld              (OnCallHeldCallback);
+            onCallUpdated_         = new OnCallUpdated           (OnCallUpdatedCallback);
             onCallSwitched_        = new OnCallSwitched          (OnCallSwitchedCallback);
 
             onMessageSentState_   = new OnMessageSentState       (OnMessageSentStateCallback);
@@ -378,6 +388,7 @@ namespace Siprix
 
             onSipNotify_          = new OnSipNotify              (OnSipNotifyCallback);
             onVuMeterLevel_       = new OnVuMeterLevel           (OnVuMeterLevelCallback);
+            onLogUploadState_     = new OnLogUploadState         (OnLogUploadStateCallback);
         }
 
         ~CoreService()
@@ -394,9 +405,9 @@ namespace Siprix
         protected virtual void Dispose(bool disposing)
         {
             if (disposing)
-            {            
+            {
             }
-                        
+
             Module_UnInitialize(modulePtr_);
             modulePtr_ = IntPtr.Zero;
         }
@@ -433,12 +444,14 @@ namespace Siprix
             Callback_SetCallRedirected(modulePtr_,       onCallRedirected_);
             Callback_SetCallSwitched(modulePtr_,         onCallSwitched_);
             Callback_SetCallHeld(modulePtr_,             onCallHeld_);
+            Callback_SetCallUpdated(modulePtr_,          onCallUpdated_);
 
             Callback_SetMessageSentState(modulePtr_,     onMessageSentState_);
             Callback_SetMessageIncoming(modulePtr_,      onMessageIncoming_);
 
             Callback_SetSipNotify(modulePtr_,            onSipNotify_);
             Callback_SetVuMeterLevel(modulePtr_,         onVuMeterLevel_);
+            Callback_SetLogUploadState(modulePtr_,       onLogUploadState_);
             return err;
         }
 
@@ -474,6 +487,11 @@ namespace Siprix
         public void WriteLog(string text)
         {
             if (modulePtr_ != IntPtr.Zero) Module_WriteLog(modulePtr_, text);
+        }
+
+        public int UploadLogFile(string description)
+        {
+            return (modulePtr_ != IntPtr.Zero) ? Module_UploadLogFile(modulePtr_, description) : ErrorCode.kNotInitialized;
         }
 
         public string ErrorText(int code)
@@ -660,6 +678,11 @@ namespace Siprix
             return Call_StopRingtone(modulePtr_);
         }
 
+        public int Call_OverrideRingtone(CallId callId, string ringtonePath)
+        {
+            return Call_OverrideRingtone(modulePtr_, callId, ringtonePath);
+        }
+
         /// [Mixer] ///////////////////////////////////////////////////////////////////////////////////////////////
         public int Mixer_SwitchToCall(CallId callId)
         {
@@ -695,68 +718,78 @@ namespace Siprix
             return Dvc_SetVideoParams(modulePtr_, getNative(vdoData));
         }
 
-        public uint Dvc_GetPlayoutDevices()
-        {
-            uint numberOfDevices=0;
-            int err = Dvc_GetPlayoutDevices(modulePtr_, ref numberOfDevices);
-            return (err==ErrorCode.kNoErr) ? numberOfDevices : 0;
-        }
-        
-        public uint Dvc_GetRecordingDevices()
+        private delegate int DeviceGetCountF(IntPtr module, ref uint numberOfDevices);
+        private uint DeviceGetCount(DeviceGetCountF deviceGetCount)
         {
             uint numberOfDevices = 0;
-            int err = Dvc_GetRecordingDevices(modulePtr_, ref numberOfDevices);
+            int err = deviceGetCount(modulePtr_, ref numberOfDevices);
             return (err == ErrorCode.kNoErr) ? numberOfDevices : 0;
         }
+
+        public uint Dvc_GetPlayoutDevices() { return DeviceGetCount(Dvc_GetPlayoutDevices); }
+        public uint Dvc_GetRecordingDevices() { return DeviceGetCount(Dvc_GetRecordingDevices); }        
+        public uint Dvc_GetVideoDevices() { return DeviceGetCount(Dvc_GetVideoDevices); }
         
-        public uint Dvc_GetVideoDevices()
+
+        private delegate int DeviceGetSelGuidF(IntPtr module, StringBuilder? guid, uint guidLength);
+
+        private string DeviceGetSelGuid(DeviceGetSelGuidF geviceGetSelGuid)
         {
-            uint numberOfDevices = 0;
-            int err = Dvc_GetVideoDevices(modulePtr_, ref numberOfDevices);
-            return (err == ErrorCode.kNoErr) ? numberOfDevices : 0;
+            uint guidLen = 64;
+            var guidBuilder = new StringBuilder((int)(guidLen + 1));
+            geviceGetSelGuid(modulePtr_, guidBuilder, guidLen);
+            return guidBuilder.ToString();
+        }
+
+        public string Dvc_GetSelRingtoneDevice() { return DeviceGetSelGuid(Dvc_GetSelRingtoneDevice); }
+        public string Dvc_GetSelPlayoutDevice() { return DeviceGetSelGuid(Dvc_GetSelPlayoutDevice); }
+        public string Dvc_GetSelRecordingDevice() { return DeviceGetSelGuid(Dvc_GetSelRecordingDevice); }
+
+        private delegate int DeviceGetNameGuidF(IntPtr module, uint index,
+                          StringBuilder? name, uint nameLength,
+                          StringBuilder? guid, uint guidLength);
+
+        private string DeviceGetNameGuid(uint index, ref string guid, DeviceGetNameGuidF deviceGetNameGuid)
+        {
+            uint nameLen = 64, guidLen = 64;
+            var nameBuilder = new StringBuilder((int)(nameLen + 1));
+            var guidBuilder = new StringBuilder((int)(guidLen + 1));
+            deviceGetNameGuid(modulePtr_, index, nameBuilder, nameLen, guidBuilder, guidLen);
+            guid = guidBuilder.ToString();
+            return nameBuilder.ToString();
         }
 
         public string Dvc_GetPlayoutDevice(uint index, ref string guid)
         {
-            uint nameLen = 64, guidLen = 64;
-            var nameBuilder = new StringBuilder((int)(nameLen + 1));
-            var guidBuilder = new StringBuilder((int)(guidLen + 1));
-            Dvc_GetPlayoutDevice(modulePtr_, index, nameBuilder, nameLen, guidBuilder, guidLen);
-            guid = guidBuilder.ToString();
-            return nameBuilder.ToString();
+            return DeviceGetNameGuid(index, ref guid, Dvc_GetPlayoutDevice);
         }
         
         public string Dvc_GetRecordingDevice(uint index, ref string guid)
         {
-            uint nameLen = 64, guidLen = 64;
-            var nameBuilder = new StringBuilder((int)(nameLen + 1));
-            var guidBuilder = new StringBuilder((int)(guidLen + 1));
-            Dvc_GetRecordingDevice(modulePtr_, index, nameBuilder, nameLen, guidBuilder, guidLen);
-            guid = guidBuilder.ToString();
-            return nameBuilder.ToString();
+            return DeviceGetNameGuid(index, ref guid, Dvc_GetRecordingDevice);
         }
         
         public string Dvc_GetVideoDevice(uint index, ref string guid)
         {
-            uint nameLen = 64, guidLen = 64;
-            var nameBuilder = new StringBuilder((int)(nameLen + 1));
-            var guidBuilder = new StringBuilder((int)(guidLen + 1));
-            Dvc_GetVideoDevice(modulePtr_, index, nameBuilder, nameLen, guidBuilder, guidLen);
-            guid = guidBuilder.ToString();
-            return nameBuilder.ToString();
+            return DeviceGetNameGuid(index, ref guid, Dvc_GetVideoDevice);
         }
         
-        public int Dvc_SetPlayoutDevice(uint index)
+        public int Dvc_SetPlayoutDevice(ushort index)
         {
             return Dvc_SetPlayoutDevice(modulePtr_, index);
         }
 
-        public int Dvc_SetRecordingDevice(uint index)
+        public int Dvc_SetRecordingDevice(ushort index)
         {
             return Dvc_SetRecordingDevice(modulePtr_, index);
         }
 
-        public int Dvc_SetVideoDevice(uint index)
+        public int Dvc_SetRingtoneDevice(ushort index)
+        {
+            return Dvc_SetRingtoneDevice(modulePtr_, index);
+        }
+
+        public int Dvc_SetVideoDevice(ushort index)
         {
             return Dvc_SetVideoDevice(modulePtr_, index);
         }
@@ -784,6 +817,10 @@ namespace Siprix
         [DllImport(DllName)]
         private static extern void Module_WriteLog(IntPtr modulePtr,
                         [MarshalAs(UnmanagedType.LPUTF8Str)] string text);
+        [DllImport(DllName)]
+        private static extern int Module_UploadLogFile(IntPtr modulePtr,
+                        [MarshalAs(UnmanagedType.LPUTF8Str)] string description);
+
         [DllImport(DllName)]
         private static extern IntPtr GetErrorText(int code);
 
@@ -898,6 +935,8 @@ namespace Siprix
         private static extern void Acc_SetIceEnabled(IntPtr acc, bool iceEnabled);
 
         [DllImport(DllName)]
+        private static extern void Acc_SetRegRetryTime(IntPtr acc, uint retryTimeSec);
+        [DllImport(DllName)]
         private static extern void Acc_SetKeepAliveTime(IntPtr acc, uint keepAliveTimeSec);
         [DllImport(DllName)]
         private static extern void Acc_SetTranspProtocol(IntPtr acc, SipTransport transp);
@@ -905,7 +944,7 @@ namespace Siprix
         private static extern void Acc_SetTranspPort(IntPtr acc, ushort transpPort);
         [DllImport(DllName)]
         private static extern void Acc_SetTranspTlsCaCert(IntPtr acc, 
-                                    [MarshalAs(UnmanagedType.LPUTF8Str)] string pathToCaCertPem);
+                                    [MarshalAs(UnmanagedType.LPUTF8Str)] string pathToCaCertPemOrBlob);
         [DllImport(DllName)]
         private static extern void Acc_SetTranspTlsClientCert(IntPtr acc,
                                     [MarshalAs(UnmanagedType.LPUTF8Str)] string pathToClientCertPem,
@@ -955,6 +994,7 @@ namespace Siprix
             if (accData.UseSipSchemeForTls!= null) Acc_SetUseSipSchemeForTls(ptr, accData.UseSipSchemeForTls.Value);
             if (accData.RtcpMuxEnabled    != null) Acc_SetRtcpMuxEnabled(ptr,     accData.RtcpMuxEnabled.Value);
             if (accData.KeepAliveTime     != null) Acc_SetKeepAliveTime(ptr,      accData.KeepAliveTime.Value);
+            if (accData.RetryTime         != null) Acc_SetRegRetryTime(ptr,       accData.RetryTime.Value);
             if (accData.IceEnabled        != null) Acc_SetIceEnabled(ptr,         accData.IceEnabled.Value);
             if (accData.StunServer        != null) Acc_SetStunServer(ptr,         accData.StunServer);
 
@@ -1067,11 +1107,11 @@ namespace Siprix
         [DllImport(DllName)]
         private static extern int Call_GetSipHeader(IntPtr module, CallId callId,
                                 [MarshalAs(UnmanagedType.LPUTF8Str)] string hdrName,
-                                [MarshalAs(UnmanagedType.LPStr)] StringBuilder? hdrVal, 
+                                [MarshalAs(UnmanagedType.LPUTF8Str)] StringBuilder? hdrVal, 
                                 ref uint hdrValLen);
         [DllImport(DllName)]
         private static extern int Call_GetStats(IntPtr module, CallId callId,
-                                [MarshalAs(UnmanagedType.LPStr)] StringBuilder? statsVal,
+                                [MarshalAs(UnmanagedType.LPUTF8Str)] StringBuilder? statsVal,
                                 ref uint statsValLen);
 
         [DllImport(DllName)]
@@ -1115,6 +1155,8 @@ namespace Siprix
         private static extern int Call_UpgradeToVideo(IntPtr module, CallId callId);
         [DllImport(DllName)]
         private static extern int Call_StopRingtone(IntPtr module);
+        [DllImport(DllName)]
+        private static extern int Call_OverrideRingtone(IntPtr module, CallId callId, [MarshalAs(UnmanagedType.LPUTF8Str)] string ringtonePath);
 
         /// [Mixer] ///////////////////////////////////////////////////////////////////////////////////////////////
         [DllImport(DllName)]
@@ -1234,26 +1276,34 @@ namespace Siprix
         private static extern int Dvc_GetVideoDevices(IntPtr module, ref uint numberOfDevices);
 
         [DllImport(DllName)]
+        private static extern int Dvc_GetSelRingtoneDevice(IntPtr module, [MarshalAs(UnmanagedType.LPStr)] StringBuilder? guid, uint guidLength);
+        [DllImport(DllName)]
+        private static extern int Dvc_GetSelPlayoutDevice(IntPtr module, [MarshalAs(UnmanagedType.LPStr)] StringBuilder? guid, uint guidLength);
+        [DllImport(DllName)]
+        private static extern int Dvc_GetSelRecordingDevice(IntPtr module, [MarshalAs(UnmanagedType.LPStr)] StringBuilder? guid, uint guidLength);
+
+
+        [DllImport(DllName)]
         private static extern int Dvc_GetPlayoutDevice(IntPtr module, uint index,
-                          [MarshalAs(UnmanagedType.LPStr)] StringBuilder? name, uint nameLength,
+                          [MarshalAs(UnmanagedType.LPUTF8Str)] StringBuilder? name, uint nameLength,
                           [MarshalAs(UnmanagedType.LPStr)] StringBuilder? guid, uint guidLength);
         [DllImport(DllName)]
         private static extern int Dvc_GetRecordingDevice(IntPtr module, uint index,
-                          [MarshalAs(UnmanagedType.LPStr)] StringBuilder? name, uint nameLength,
+                          [MarshalAs(UnmanagedType.LPUTF8Str)] StringBuilder? name, uint nameLength,
                           [MarshalAs(UnmanagedType.LPStr)] StringBuilder? guid, uint guidLength);
         [DllImport(DllName)]
         private static extern int Dvc_GetVideoDevice(IntPtr module, uint index,
-                          [MarshalAs(UnmanagedType.LPStr)] StringBuilder? name, uint nameLength,
+                          [MarshalAs(UnmanagedType.LPUTF8Str)] StringBuilder? name, uint nameLength,
                           [MarshalAs(UnmanagedType.LPStr)] StringBuilder? guid, uint guidLength);
 
         [DllImport(DllName)]
-        private static extern int Dvc_SetPlayoutDevice(IntPtr module, uint index);
+        private static extern int Dvc_SetPlayoutDevice(IntPtr module, ushort index);
+        [DllImport(DllName)]
+        private static extern int Dvc_SetRecordingDevice(IntPtr module, ushort index);
+        [DllImport(DllName)]
+        private static extern int Dvc_SetRingtoneDevice(IntPtr module, ushort index);
 
         [DllImport(DllName)]
-        private static extern int Dvc_SetRecordingDevice(IntPtr module, uint index);
-
-        [DllImport(DllName)]
-        
         private static extern int Dvc_SetVideoDevice(IntPtr module, uint index);
         [DllImport(DllName)]
         private static extern bool Dvc_IsSelected(IntPtr module, [MarshalAs(UnmanagedType.LPUTF8Str)] string guid);
@@ -1286,6 +1336,7 @@ namespace Siprix
                                             [MarshalAs(UnmanagedType.LPUTF8Str)] string referTo);
         private delegate void OnCallDtmfReceived(CallId callId, ushort tone);
         private delegate void OnCallHeld(CallId callId, HoldState state);
+        private delegate void OnCallUpdated(CallId callId);
         private delegate void OnCallSwitched(CallId callId);
 
         private delegate void OnMessageSentState(MessageId messageId, bool success,
@@ -1299,6 +1350,8 @@ namespace Siprix
                                             [MarshalAs(UnmanagedType.LPUTF8Str)] string body);
 
         private delegate void OnVuMeterLevel(int micLevel, int spkLevel);
+
+        private delegate void OnLogUploadState(bool success, string response);
 
         [DllImport(DllName)]
         private static extern int Callback_SetTrialModeNotified(IntPtr module, OnTrialModeNotified callback);
@@ -1333,6 +1386,8 @@ namespace Siprix
         [DllImport(DllName)]
         private static extern int Callback_SetCallHeld(IntPtr module, OnCallHeld callback);
         [DllImport(DllName)]
+        private static extern int Callback_SetCallUpdated(IntPtr module, OnCallUpdated callback);
+        [DllImport(DllName)]
         private static extern int Callback_SetMessageSentState(IntPtr module, OnMessageSentState callback);
         [DllImport(DllName)]
         private static extern int Callback_SetMessageIncoming(IntPtr module, OnMessageIncoming callback);
@@ -1341,6 +1396,8 @@ namespace Siprix
         private static extern int Callback_SetSipNotify(IntPtr module, OnSipNotify callback);
         [DllImport(DllName)]
         private static extern int Callback_SetVuMeterLevel(IntPtr module, OnVuMeterLevel callback);
+        [DllImport(DllName)]
+        private static extern int Callback_SetLogUploadState(IntPtr module, OnLogUploadState callback);
 
         void OnTrialModeNotifiedCallback()
         {
@@ -1428,6 +1485,11 @@ namespace Siprix
             eventDelegate_?.OnCallHeld(callId, state);
         }
 
+        void OnCallUpdatedCallback(CallId callId)
+        {
+            eventDelegate_?.OnCallUpdated(callId);
+        }
+
         void OnCallSwitchedCallback(CallId callId)
         {
             eventDelegate_?.OnCallSwitched(callId);
@@ -1451,6 +1513,11 @@ namespace Siprix
         void OnVuMeterLevelCallback(int micLevel, int spkLevel)
         {
             eventDelegate_?.OnVuMeterLevel(micLevel, spkLevel);
+        }
+
+        void OnLogUploadStateCallback(bool success, string response)
+        {
+            eventDelegate_?.OnLogUploadState(success, response);
         }
 
     }//Module

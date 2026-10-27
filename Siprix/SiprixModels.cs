@@ -6,10 +6,13 @@ using System.ComponentModel;
 using System.Windows.Input;
 using System.Diagnostics;
 using System.Text.Json;
+using System.Text;
 //using Windows.Devices.Sensors;
 
 
 namespace Siprix;
+
+using static Siprix.CallsListModel;
 
 #if WPF_PROJECT
 using AppDispatcher = System.Windows.Threading.Dispatcher;
@@ -578,6 +581,15 @@ public class CallModel : INotifyPropertyChanged
         return err;        
     }
 
+    public int OverrideRingtone(string pathToRigntoneMp3File)
+    {
+        parent_.Logs?.Print($"OverrideRingtone callId:{myCallId_} {pathToRigntoneMp3File}");
+        int err = parent_.Core.Call_OverrideRingtone(myCallId_, pathToRigntoneMp3File);
+        if (err != ErrorCode.kNoErr)
+            parent_.Logs?.Print($"Cant OverrideRingtone callId:{myCallId_} Err:{err} {parent_.ErrorText(err)}");
+        return err;
+    }
+
     public int PlayFile(string pathToMp3File, bool loop)
     {
         parent_.Logs?.Print($"Starting play file callId:{myCallId_} {pathToMp3File}");
@@ -956,10 +968,15 @@ public class CallsListModel(ObjModel parent_) : INotifyPropertyChanged
     {
         parent_.Logs?.Print($"onSwitched callId:{callId}");
 
-        var callModel = collection_.Where(a => a.ID == callId).FirstOrDefault();            
+        var callModel = collection_.Where(a => a.ID == callId).FirstOrDefault();
         SwitchedCall = callModel;
 
         foreach (var c in collection_) c.OnCallSwitched();
+    }
+
+    internal void OnCallUpdated(uint callId)
+    {
+        parent_.Logs?.Print($"onCallUpdated callId:{callId}");
     }
 
     internal void OnPlayerState(uint playerId, PlayerState state)
@@ -1555,77 +1572,76 @@ public class Device
 public class DevicesModel(ObjModel parent_) : INotifyPropertyChanged
 {
     public event PropertyChangedEventHandler? PropertyChanged;
+    internal delegate string GetDeviceF(uint index, ref string guid);
+    internal delegate uint GetDevicesCountF();
+    internal delegate string GetSelGuidF();
 
     readonly ObservableCollection<Device> playback_ = [];
     readonly ObservableCollection<Device> record_ = [];
     readonly ObservableCollection<Device> video_ = [];
-    uint selPlaybackIndex_=0;
-    uint selRecordIndex_ = 0;
-    uint selVideoIndex_ = 0;
+    ushort selRingtoneIndex_= 0, selPlaybackIndex_ = 0, selRecordIndex_ = 0, selVideoIndex_ = 0;
+
     public ObservableCollection<Device> Playback { get { return playback_; } }
     public ObservableCollection<Device> Record { get { return record_; } }
     public ObservableCollection<Device> Video { get { return video_; } }
 
-    public uint SelectedPlayback { 
+    public ushort SelectedPlayback { 
         get { return selPlaybackIndex_; }
         set { selPlaybackIndex_ = value; parent_.Core.Dvc_SetPlayoutDevice(value); }
     }
-    public uint SelectedRecord {
+    public ushort SelectedRingtone
+    {
+        get { return selRingtoneIndex_; }
+        set { selRingtoneIndex_ = value; parent_.Core.Dvc_SetRingtoneDevice(value); }
+    }
+    
+    public ushort SelectedRecord {
         get { return selRecordIndex_; }
         set { selRecordIndex_ = value; parent_.Core.Dvc_SetRecordingDevice(value); } 
     }
-    public uint SelectedVideo {
+    public ushort SelectedVideo {
         get { return selVideoIndex_; }
         set { selVideoIndex_ = value; parent_.Core.Dvc_SetVideoDevice(value); }
     }
 
     public void Load()
     {
-        LoadPlayback();
-        LoadRecord();
-        LoadVideo();
+        LoadAudioDevices();
+        LoadDevicesList(video_, parent_.Core.Dvc_GetVideoDevices, parent_.Core.Dvc_GetVideoDevice);  
     }
 
-    internal void LoadPlayback()
+    void LoadAudioDevices()
     {
-        playback_.Clear();
-        string guid="";
-        uint playbackCount = parent_.Core.Dvc_GetPlayoutDevices();
-        for(uint i=0; i < playbackCount; ++i)
-        {
-            string name = parent_.Core.Dvc_GetPlayoutDevice(i, ref guid);
-            playback_.Add(new Device(i, name, guid));
-        }
+        LoadDevicesList(playback_, parent_.Core.Dvc_GetPlayoutDevices, parent_.Core.Dvc_GetPlayoutDevice);
+        LoadDevicesList(record_, parent_.Core.Dvc_GetRecordingDevices, parent_.Core.Dvc_GetRecordingDevice);
+
+        selPlaybackIndex_ = GetIndexOf(playback_, parent_.Core.Dvc_GetSelPlayoutDevice);
+        selRingtoneIndex_ = GetIndexOf(playback_, parent_.Core.Dvc_GetSelRingtoneDevice);
+        selRecordIndex_ = GetIndexOf(record_, parent_.Core.Dvc_GetSelRecordingDevice);
     }
 
-    internal void LoadRecord()
+    ushort GetIndexOf(ObservableCollection<Device> devices, GetSelGuidF getSelGuid)
     {
-        record_.Clear(); 
+        var item = devices.FirstOrDefault(p => string.Equals(p.Guid, getSelGuid()));
+        return (ushort)((item != null) ? devices.IndexOf(item) : 0);
+    }
+
+    internal void LoadDevicesList(ObservableCollection<Device> devices, GetDevicesCountF getCount, GetDeviceF getDevice)
+    {
+        devices.Clear();
         string guid = "";
-        uint recordCount = parent_.Core.Dvc_GetRecordingDevices();
-        for (uint i = 0; i < recordCount; ++i)
+        uint count = getCount();
+        for (uint i = 0; i < count; ++i)
         {
-            string name = parent_.Core.Dvc_GetRecordingDevice(i, ref guid);
-            record_.Add(new Device(i, name, guid));
+            string name = getDevice(i, ref guid);
+            devices.Add(new Device(i, name, guid));
         }
     }
 
-    internal void LoadVideo()
-    {
-        video_.Clear();
-        string guid = "";
-        uint videoCount = parent_.Core.Dvc_GetVideoDevices();
-        for (uint i = 0; i < videoCount; ++i)
-        {
-            string name = parent_.Core.Dvc_GetVideoDevice(i, ref guid);
-            video_.Add(new Device(i, name, guid));
-        }
-    }
     //Event raised by SDK
     internal void OnDevicesAudioChanged()
     {
-        LoadPlayback();
-        LoadRecord();
+        LoadAudioDevices();
         parent_.Logs?.Print($"onDevicesAudioChanged");
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Playback)));
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Record)));
@@ -1712,6 +1728,9 @@ public class ObjModel
         devicesModel_ = new DevicesModel(this);
     }
 
+    public delegate void LogUploadStateHandler(bool success, string response);
+    public event LogUploadStateHandler? LogUploadState;
+
     public SubscriptionsListModel Subscriptions { get { return subscrListModel_; } }
     public MessagesListModel Messages { get { return messagesListModel_; } }
     public AccountsListModel Accounts { get { return accountsListModel_; } }
@@ -1731,7 +1750,7 @@ public class ObjModel
         eventHandler_ = new EventsHandler(this, dispatcher);
 
         IniData iniData = new();
-        iniData.License = "...license-credentials...";
+        iniData.License = "...license-credentials...";//TODO Put license here
         iniData.SingleCallMode = false;
         iniData.LogLevelIde = LogLevel.Debug;
         iniData.LogLevelFile = LogLevel.Debug;
@@ -1773,6 +1792,11 @@ public class ObjModel
     {
         uint playerId=0;
         core_.Call_PlayTone(0, tone, durationMs, ref playerId);
+    }
+
+    public int UploadLogFile(string description)
+    {
+        return core_.UploadLogFile(description);
     }
 
     public void UnInitialize()
@@ -1925,6 +1949,13 @@ public class ObjModel
             }));
         }
 
+        public void OnCallUpdated(uint callId)
+        {
+            dispatcher_?.BeginInvoke(new Action(() => {
+                parent_.callsListModel_.OnCallUpdated(callId);
+            }));
+        }
+
         public void OnCallSwitched(uint callId)
         {
             dispatcher_?.BeginInvoke(new Action(() => {
@@ -1954,6 +1985,16 @@ public class ObjModel
         }
 
         public void OnVuMeterLevel(int micLevel, int spkLevel) { }
+
+        public void OnLogUploadState(bool success, string response)
+        {
+            if (parent_.LogUploadState != null)
+            {
+                dispatcher_?.BeginInvoke(new Action(() => {
+                    parent_.LogUploadState(success, response);
+                }));
+            }   
+        }
     }
 
 }//ObjModel

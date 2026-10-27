@@ -198,6 +198,7 @@ namespace Siprix
             public void OnCallRedirected(uint origCallId, uint relatedCallId, string referTo) {}
             public void OnCallDtmfReceived(uint callId, ushort tone) { }
             public void OnCallHeld(uint callId, HoldState state) { }
+            public void OnCallUpdated(uint callId) { }
             public void OnCallSwitched(uint callId) { }
 
             public void OnMessageSentState(uint messageId, bool success, string response) { }
@@ -205,6 +206,7 @@ namespace Siprix
 
             public void OnSipNotify(uint accId, string hdrEvent, string body) { }
             public void OnVuMeterLevel(int micLevel, int spkLevel) { }
+            public void OnLogUploadState(bool success, string response) { }
         }
 
     }//DirectCallModel
