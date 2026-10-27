@@ -1,5 +1,4 @@
-﻿using Siprix;
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -53,6 +52,7 @@ public partial class MainWindow : Window
         cbVideo.DataContext    = objModel_.Devices;
         cbRecord.DataContext   = objModel_.Devices;
         cbPlayback.DataContext = objModel_.Devices;
+        cbRingtone.DataContext = objModel_.Devices;
     }
 
     private void Window_Closed(object sender, EventArgs e)
@@ -213,5 +213,11 @@ public partial class MainWindow : Window
         {
             UseShellExecute = true
         });
+    }
+
+    private void UploadLog_Click(object sender, RoutedEventArgs e)
+    {
+        UploadLogWindow wnd = new(objModel_);
+        wnd.ShowDialog();
     }
 }
